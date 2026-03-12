@@ -48,6 +48,13 @@ class JobResponse(BaseModel):
 class JobSearchRequest(BaseModel):
     query: Optional[str] = None
     location: Optional[str] = None
-    remote_only: bool = False
+    remote_only: Optional[bool] = None
+    salary_min: Optional[int] = None
+    salary_max: Optional[int] = None
+    sources: Optional[list[str]] = None  # jsearch, adzuna
+    score_results: bool = True
+    min_fit_score: Optional[float] = None
+    max_scored_jobs: int = 8
+    country: Optional[str] = None  # Adzuna country code, e.g. us, gb, de
     page: int = 1
     per_page: int = 20

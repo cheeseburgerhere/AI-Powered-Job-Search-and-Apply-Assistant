@@ -1,12 +1,28 @@
 import { useEffect, useState } from 'react'
 import { useJobStore, type Job } from '../stores/jobStore'
 import { Link } from 'react-router-dom'
-import { Plus, Star, ExternalLink, Loader2, Trash2 } from 'lucide-react'
+import { Plus, Star, ExternalLink, Loader2, Trash2, Search, SlidersHorizontal } from 'lucide-react'
 
 export default function JobFeed() {
-  const { jobs, loading, fetchJobs, createJob, scoreJob, deleteJob } = useJobStore()
+  const { jobs, loading, error, fetchJobs, createJob, scoreJob, deleteJob, searchJobs } = useJobStore()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ title: '', company: '', description: '', url: '', location: '', remote_type: '' })
+  const [showSearchFilters, setShowSearchFilters] = useState(true)
+  const [searchSummary, setSearchSummary] = useState('')
+  const [searchForm, setSearchForm] = useState({
+    query: '',
+    location: '',
+    remote_only: false,
+    salary_min: '',
+    salary_max: '',
+    min_fit_score: '',
+    max_scored_jobs: '8',
+    per_page: '20',
+    country: 'us',
+    score_results: true,
+    use_jsearch: true,
+    use_adzuna: true,
+  })
   const [scoring, setScoring] = useState<number | null>(null)
 
   useEffect(() => {
@@ -42,6 +58,43 @@ export default function JobFeed() {
     setScoring(null)
   }
 
+  const handleAutoFind = async () => {
+    const query = searchForm.query.trim()
+
+    const sources = [
+      searchForm.use_jsearch ? 'jsearch' : '',
+      searchForm.use_adzuna ? 'adzuna' : '',
+    ].filter(Boolean)
+
+    if (sources.length === 0) {
+      setSearchSummary('Select at least one source (JSearch or Adzuna).')
+      return
+    }
+
+    try {
+      const found = await searchJobs({
+        query: query || undefined,
+        location: searchForm.location.trim() || undefined,
+        remote_only: searchForm.remote_only,
+        salary_min: searchForm.salary_min ? parseInt(searchForm.salary_min) : undefined,
+        salary_max: searchForm.salary_max ? parseInt(searchForm.salary_max) : undefined,
+        min_fit_score: searchForm.min_fit_score ? parseFloat(searchForm.min_fit_score) : undefined,
+        max_scored_jobs: searchForm.max_scored_jobs ? parseInt(searchForm.max_scored_jobs) : 8,
+        per_page: searchForm.per_page ? parseInt(searchForm.per_page) : 20,
+        score_results: searchForm.score_results,
+        sources,
+        country: searchForm.country.trim() || undefined,
+      })
+      if (found.length === 0) {
+        setSearchSummary('Found 0 jobs. Try broader query/location, disable Remote only, or remove Min Fit Score.')
+      } else {
+        setSearchSummary(`Found ${found.length} job(s) matching your conditions.`)
+      }
+    } catch {
+      setSearchSummary('Auto find failed. Check provider keys and conditions.')
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -56,6 +109,172 @@ export default function JobFeed() {
           <Plus size={16} />
           Add Job
         </button>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">{error}</div>
+      )}
+
+      {/* Auto Find */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Search size={18} />
+            Auto Find Jobs
+          </h2>
+          <button
+            onClick={() => setShowSearchFilters((v) => !v)}
+            className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-1"
+          >
+            <SlidersHorizontal size={14} />
+            {showSearchFilters ? 'Hide Filters' : 'Show Filters'}
+          </button>
+        </div>
+
+        {showSearchFilters && (
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Role / Query *</label>
+              <input
+                type="text"
+                value={searchForm.query}
+                onChange={(e) => setSearchForm((s) => ({ ...s, query: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g. backend engineer"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+              <input
+                type="text"
+                value={searchForm.location}
+                onChange={(e) => setSearchForm((s) => ({ ...s, location: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g. Berlin"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Country (Adzuna)</label>
+              <input
+                type="text"
+                value={searchForm.country}
+                onChange={(e) => setSearchForm((s) => ({ ...s, country: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="us"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Min Salary</label>
+              <input
+                type="number"
+                value={searchForm.salary_min}
+                onChange={(e) => setSearchForm((s) => ({ ...s, salary_min: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="80000"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Max Salary</label>
+              <input
+                type="number"
+                value={searchForm.salary_max}
+                onChange={(e) => setSearchForm((s) => ({ ...s, salary_max: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="180000"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Min Fit Score (0-10)</label>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                step="0.1"
+                value={searchForm.min_fit_score}
+                onChange={(e) => setSearchForm((s) => ({ ...s, min_fit_score: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="6.5"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Results Limit</label>
+              <input
+                type="number"
+                min="1"
+                max="100"
+                value={searchForm.per_page}
+                onChange={(e) => setSearchForm((s) => ({ ...s, per_page: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Max AI-Scored Jobs</label>
+              <input
+                type="number"
+                min="0"
+                max="30"
+                value={searchForm.max_scored_jobs}
+                onChange={(e) => setSearchForm((s) => ({ ...s, max_scored_jobs: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex items-end">
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={searchForm.remote_only}
+                  onChange={(e) => setSearchForm((s) => ({ ...s, remote_only: e.target.checked }))}
+                />
+                Remote only
+              </label>
+            </div>
+            <div className="md:col-span-3 flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={searchForm.score_results}
+                  onChange={(e) => setSearchForm((s) => ({ ...s, score_results: e.target.checked }))}
+                />
+                Score with AI
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={searchForm.use_jsearch}
+                  onChange={(e) => setSearchForm((s) => ({ ...s, use_jsearch: e.target.checked }))}
+                />
+                JSearch
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={searchForm.use_adzuna}
+                  onChange={(e) => setSearchForm((s) => ({ ...s, use_adzuna: e.target.checked }))}
+                />
+                Adzuna
+              </label>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-4 flex items-center gap-3">
+          <button
+            onClick={handleAutoFind}
+            disabled={loading}
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+          >
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+            Auto Find
+          </button>
+          <button
+            onClick={() => fetchJobs()}
+            disabled={loading}
+            className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 disabled:opacity-50"
+          >
+            Show Saved Jobs
+          </button>
+          {searchSummary && <span className="text-sm text-gray-500">{searchSummary}</span>}
+        </div>
       </div>
 
       {/* Add Job Form */}

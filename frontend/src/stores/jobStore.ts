@@ -24,6 +24,21 @@ export interface Job {
   updated_at: string | null
 }
 
+export interface JobSearchFilters {
+  query?: string
+  location?: string
+  remote_only?: boolean
+  salary_min?: number
+  salary_max?: number
+  sources?: string[]
+  score_results?: boolean
+  min_fit_score?: number
+  max_scored_jobs?: number
+  page?: number
+  per_page?: number
+  country?: string
+}
+
 interface JobState {
   jobs: Job[]
   nudges: Job[]
@@ -35,6 +50,7 @@ interface JobState {
   updateJob: (id: number, data: { status?: string; notes?: string; next_follow_up?: string }) => Promise<void>
   deleteJob: (id: number) => Promise<void>
   scoreJob: (id: number) => Promise<void>
+  searchJobs: (filters: JobSearchFilters) => Promise<Job[]>
   fetchNudges: () => Promise<void>
 }
 
@@ -74,6 +90,24 @@ export const useJobStore = create<JobState>((set) => ({
   scoreJob: async (id) => {
     const { data } = await api.post(`/jobs/${id}/score`)
     set((s) => ({ jobs: s.jobs.map((j) => (j.id === id ? data : j)) }))
+  },
+
+  searchJobs: async (filters) => {
+    set({ loading: true, error: null })
+    try {
+      const { data } = await api.post('/jobs/search', filters)
+      set({ jobs: data, loading: false })
+      return data
+    } catch (err: any) {
+      const status = err?.response?.status
+      const detail = err?.response?.data?.detail || ''
+      if (status === 404 && typeof detail === 'string' && detail.toLowerCase().includes('no jobs found')) {
+        set({ jobs: [], loading: false, error: null })
+        return []
+      }
+      set({ loading: false, error: detail || 'Job search failed' })
+      throw err
+    }
   },
 
   fetchNudges: async () => {
