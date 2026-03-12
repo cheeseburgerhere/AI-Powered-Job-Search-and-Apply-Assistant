@@ -1,0 +1,123 @@
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
+from sqlalchemy.orm import Session
+from typing import Optional
+
+from app.database import get_db
+from app.models.profile import Profile
+from app.schemas.profile import (
+    ProfileResponse,
+    ProfileUpdate,
+    PreferencesUpdate,
+    WritingSampleInput,
+)
+from app.services.resume_parser import extract_text_from_pdf, parse_resume
+from app.services.ai_service import get_ai_service
+
+router = APIRouter(prefix="/api/profile", tags=["profile"])
+
+
+def _get_or_create_profile(db: Session) -> Profile:
+    """Get the single profile or create one."""
+    profile = db.query(Profile).first()
+    if not profile:
+        profile = Profile()
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
+    return profile
+
+
+@router.get("", response_model=ProfileResponse)
+def get_profile(db: Session = Depends(get_db)):
+    profile = _get_or_create_profile(db)
+    return profile
+
+
+@router.post("/upload-resume", response_model=ProfileResponse)
+async def upload_resume(
+    db: Session = Depends(get_db),
+    file: Optional[UploadFile] = File(None),
+    resume_text: Optional[str] = Form(None),
+):
+    if not file and not resume_text:
+        raise HTTPException(status_code=400, detail="Provide either a PDF file or resume text")
+
+    # Extract text from PDF or use provided text
+    if file:
+        if not file.filename.lower().endswith(".pdf"):
+            raise HTTPException(status_code=400, detail="Only PDF files are supported")
+        contents = await file.read()
+        text = extract_text_from_pdf(contents)
+    else:
+        text = resume_text
+
+    # Parse with AI
+    parsed = parse_resume(text)
+
+    # Update or create profile
+    profile = _get_or_create_profile(db)
+    profile.raw_resume_text = text
+    profile.full_name = parsed.get("full_name", "")
+    profile.email = parsed.get("email", "")
+    profile.phone = parsed.get("phone", "")
+    profile.location = parsed.get("location", "")
+    profile.summary = parsed.get("summary", "")
+    profile.skills = parsed.get("skills", [])
+    profile.experiences = parsed.get("experiences", [])
+    profile.education = parsed.get("education", [])
+    profile.certifications = parsed.get("certifications", [])
+
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+@router.put("", response_model=ProfileResponse)
+def update_profile(update: ProfileUpdate, db: Session = Depends(get_db)):
+    profile = _get_or_create_profile(db)
+    update_data = update.model_dump(exclude_unset=True)
+    # Convert nested Pydantic models to dicts for JSON columns
+    for key, value in update_data.items():
+        if isinstance(value, list) and value and hasattr(value[0], "model_dump"):
+            update_data[key] = [v.model_dump() for v in value]
+        setattr(profile, key, value)
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+@router.post("/writing-sample", response_model=ProfileResponse)
+def add_writing_sample(sample: WritingSampleInput, db: Session = Depends(get_db)):
+    profile = _get_or_create_profile(db)
+    samples = list(profile.writing_samples or [])
+    samples.append(sample.text)
+    profile.writing_samples = samples
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+@router.post("/analyze-voice", response_model=ProfileResponse)
+def analyze_voice(db: Session = Depends(get_db)):
+    profile = _get_or_create_profile(db)
+    if not profile.writing_samples:
+        raise HTTPException(status_code=400, detail="Add writing samples first")
+
+    ai = get_ai_service()
+    voice = ai.analyze_voice(profile.writing_samples)
+    profile.voice_profile = voice
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+@router.put("/preferences", response_model=ProfileResponse)
+def update_preferences(prefs: PreferencesUpdate, db: Session = Depends(get_db)):
+    profile = _get_or_create_profile(db)
+    current = dict(profile.preferences or {})
+    update_data = prefs.model_dump(exclude_unset=True)
+    current.update(update_data)
+    profile.preferences = current
+    db.commit()
+    db.refresh(profile)
+    return profile
