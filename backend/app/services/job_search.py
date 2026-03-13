@@ -490,7 +490,19 @@ class JobSearchService:
                 return json.loads(body)
         except urllib.error.HTTPError as exc:
             details = exc.read().decode("utf-8", errors="ignore")
-            raise RuntimeError(f"HTTP {exc.code}: {details[:300]}") from exc
+            # Try to extract a clean message from JSON error bodies
+            try:
+                err_json = json.loads(details)
+                msg = (
+                    err_json.get("error", {}).get("message")
+                    or err_json.get("message")
+                    or err_json.get("error")
+                )
+                if msg:
+                    raise RuntimeError(f"HTTP {exc.code}: {msg}") from exc
+            except (json.JSONDecodeError, AttributeError):
+                pass
+            raise RuntimeError(f"HTTP {exc.code}: {details[:200]}") from exc
         except urllib.error.URLError as exc:
             raise RuntimeError(f"Network error: {exc.reason}") from exc
 
