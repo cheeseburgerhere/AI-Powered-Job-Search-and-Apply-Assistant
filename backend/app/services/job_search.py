@@ -1,4 +1,6 @@
+import hashlib
 import json
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -10,7 +12,15 @@ from app.config import get_settings
 class JobSearchService:
     """Fetch and normalize jobs from external providers."""
 
-    SUPPORTED_SOURCES = {"jsearch", "adzuna"}
+    SUPPORTED_SOURCES = {"jsearch", "adzuna", "google_scrape"}
+
+    # Job board sites to search via Google scraping.
+    # Each entry: (site domain for Google site: query, readable label, URL parser function name)
+    DEFAULT_SCRAPE_SITES = [
+        "boards.greenhouse.io",
+        "jobs.lever.co",
+        "jobs.ashbyhq.com",
+    ]
 
     def __init__(self):
         self.settings = get_settings()
@@ -21,6 +31,8 @@ class JobSearchService:
             sources.append("jsearch")
         if self._is_real_secret(self.settings.adzuna_app_id) and self._is_real_secret(self.settings.adzuna_api_key):
             sources.append("adzuna")
+        if self._is_real_secret(self.settings.google_api_key) and self._is_real_secret(self.settings.google_cse_id):
+            sources.append("google_scrape")
         return sources
 
     def search_jobs(
@@ -34,6 +46,7 @@ class JobSearchService:
         per_page: int,
         sources: list[str] | None,
         country: str | None,
+        scrape_sites: list[str] | None = None,
     ) -> dict[str, Any]:
         requested_sources = [s.lower().strip() for s in (sources or self.configured_sources()) if s]
         requested_sources = [s for s in requested_sources if s in self.SUPPORTED_SOURCES]
@@ -59,6 +72,12 @@ class JobSearchService:
                 all_jobs.extend(self._search_adzuna(query, location, remote_only, salary_min, salary_max, page, per_page, country))
             except Exception as exc:
                 errors.append(f"adzuna: {exc}")
+
+        if "google_scrape" in requested_sources:
+            try:
+                all_jobs.extend(self._search_google_scrape(query, location, remote_only, per_page, scrape_sites))
+            except Exception as exc:
+                errors.append(f"google_scrape: {exc}")
 
         filtered = self._apply_filters(all_jobs, remote_only=remote_only, salary_min=salary_min, salary_max=salary_max)
         deduped = self._dedupe(filtered)
@@ -122,6 +141,9 @@ class JobSearchService:
 
         return normalized
 
+    # European country codes supported by Adzuna
+    EUROPE_COUNTRIES = ["gb", "de", "fr", "nl", "pl", "it", "es", "at", "be", "ch"]
+
     def _search_adzuna(
         self,
         query: str,
@@ -136,7 +158,38 @@ class JobSearchService:
         if not (self._is_real_secret(self.settings.adzuna_app_id) and self._is_real_secret(self.settings.adzuna_api_key)):
             raise RuntimeError("ADZUNA_APP_ID / ADZUNA_API_KEY are not configured")
 
-        adzuna_country = (country or "us").lower().strip()
+        adzuna_country = (country or "europe").lower().strip()
+
+        # Fan out across all European countries and merge
+        if adzuna_country == "europe":
+            all_results: list[dict[str, Any]] = []
+            per_country = max(1, per_page // len(self.EUROPE_COUNTRIES))
+            for code in self.EUROPE_COUNTRIES:
+                try:
+                    all_results.extend(
+                        self._search_adzuna_single(
+                            query, location, remote_only, salary_min, salary_max, page, per_country, code
+                        )
+                    )
+                except Exception:
+                    pass  # skip countries that error
+            return all_results
+
+        return self._search_adzuna_single(
+            query, location, remote_only, salary_min, salary_max, page, per_page, adzuna_country
+        )
+
+    def _search_adzuna_single(
+        self,
+        query: str,
+        location: str | None,
+        remote_only: bool,
+        salary_min: int | None,
+        salary_max: int | None,
+        page: int,
+        per_page: int,
+        adzuna_country: str,
+    ) -> list[dict[str, Any]]:
         what = query.strip()
         if remote_only:
             what = f"{what} remote"
@@ -188,6 +241,170 @@ class JobSearchService:
             )
 
         return normalized
+
+    # ---- Google CSE-based search ----
+
+    _CSE_ENDPOINT = "https://www.googleapis.com/customsearch/v1"
+
+    def _search_google_scrape(
+        self,
+        query: str,
+        location: str | None,
+        remote_only: bool,
+        per_page: int,
+        sites: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Use Google Custom Search Engine API to find jobs on known ATS boards."""
+        if not self._is_real_secret(self.settings.google_api_key) or not self._is_real_secret(self.settings.google_cse_id):
+            raise RuntimeError(
+                "Google CSE not configured. Set GOOGLE_API_KEY and GOOGLE_CSE_ID in .env."
+            )
+
+        target_sites = sites or self.DEFAULT_SCRAPE_SITES
+        all_jobs: list[dict[str, Any]] = []
+        seen_urls: set[str] = set()
+        site_errors: list[str] = []
+
+        for site in target_sites:
+            try:
+                items = self._cse_site_search(site, query, location, remote_only, min(per_page, 10))
+                for item in items:
+                    url = item.get("link", "")
+                    if not url or url in seen_urls:
+                        continue
+                    seen_urls.add(url)
+                    title = item.get("title", "")
+                    snippet = item.get("snippet", "")
+                    parsed = self._parse_job_board_url(url, site, snippet, cse_title=title)
+                    if parsed:
+                        all_jobs.append(parsed)
+            except Exception as exc:
+                site_errors.append(f"{site}: {exc}")
+
+        if not all_jobs and site_errors:
+            raise RuntimeError("; ".join(site_errors))
+
+        return all_jobs
+
+    def _cse_site_search(
+        self,
+        site: str,
+        query: str,
+        location: str | None,
+        remote_only: bool,
+        num: int,
+    ) -> list[dict[str, Any]]:
+        """Run a single Google CSE query and return raw result items."""
+        search_query = f'site:{site} "{query}"'
+        if location:
+            search_query += f" {location}"
+        if remote_only:
+            search_query += " remote"
+
+        params = {
+            "key": self.settings.google_api_key,
+            "cx": self.settings.google_cse_id,
+            "q": search_query,
+            "num": max(1, min(num, 10)),  # CSE hard limit: 10 per call
+        }
+        url = f"{self._CSE_ENDPOINT}?{urllib.parse.urlencode(params)}"
+        data = self._http_get_json(url)
+        return data.get("items", [])
+
+    def _parse_job_board_url(
+        self, url: str, site: str, snippet: str, cse_title: str = ""
+    ) -> dict[str, Any] | None:
+        """Parse a job board URL into a normalized job dict.
+
+        Greenhouse: https://boards.greenhouse.io/{company}/jobs/{id}
+        Lever:      https://jobs.lever.co/{company}/{id}
+        Ashby:      https://jobs.ashbyhq.com/{company}/jobs/{slug}
+        """
+        parsed = urllib.parse.urlparse(url)
+        path_parts = [p for p in parsed.path.strip("/").split("/") if p]
+
+        if not path_parts:
+            return None
+
+        company = ""
+        title = ""
+        external_id = ""
+
+        if site == "boards.greenhouse.io":
+            company = path_parts[0] if len(path_parts) >= 1 else ""
+            external_id = path_parts[2] if len(path_parts) >= 3 else ""
+            title = cse_title or self._title_from_snippet(snippet, company)
+
+        elif site == "jobs.lever.co":
+            company = path_parts[0] if len(path_parts) >= 1 else ""
+            external_id = path_parts[1] if len(path_parts) >= 2 else ""
+            title = cse_title or self._title_from_snippet(snippet, company)
+
+        elif site == "jobs.ashbyhq.com":
+            company = path_parts[0] if len(path_parts) >= 1 else ""
+            slug = path_parts[-1] if len(path_parts) >= 2 else ""
+            external_id = slug
+            title = cse_title or slug.replace("-", " ").title() or self._title_from_snippet(snippet, company)
+
+        else:
+            company = path_parts[0] if path_parts else ""
+            external_id = path_parts[-1] if len(path_parts) >= 2 else ""
+            title = cse_title or self._title_from_snippet(snippet, company)
+
+        if not company and not title:
+            return None
+
+        display_company = company.replace("-", " ").replace("_", " ").title()
+
+        if not external_id:
+            external_id = hashlib.md5(url.encode()).hexdigest()[:12]
+
+        return {
+            "external_id": f"{site}:{external_id}",
+            "source": "google_scrape",
+            "title": title or "Open Position",
+            "company": display_company,
+            "location": "",
+            "remote_type": self._infer_remote_type(
+                explicit_remote=None,
+                text_chunks=[title, snippet],
+            ),
+            "salary_min": None,
+            "salary_max": None,
+            "description": snippet,
+            "url": url,
+        }
+
+    def _title_from_snippet(self, snippet: str, company: str) -> str:
+        """Try to extract a job title from a Google snippet.
+
+        Google snippets for job boards often start with the job title.
+        Common patterns:
+          - "Senior Engineer at Company - ..."
+          - "Senior Engineer - Company"
+          - "Company: Senior Engineer"
+        """
+        if not snippet:
+            return ""
+
+        text = snippet.strip()
+
+        # Pattern: "Title at Company" or "Title - Company"
+        # Try splitting on common separators
+        for sep in [" at ", " - ", " | ", " — ", " – ", ": "]:
+            if sep in text:
+                parts = text.split(sep, 1)
+                candidate = parts[0].strip()
+                # If it's reasonably short and doesn't look like a URL, use it
+                if 3 < len(candidate) < 100 and "http" not in candidate.lower():
+                    return candidate
+
+        # Fallback: use the first sentence-like chunk
+        first_chunk = re.split(r"[.!?\n]", text)[0].strip()
+        if 3 < len(first_chunk) < 100:
+            return first_chunk
+
+        return ""
 
     def _apply_filters(
         self,

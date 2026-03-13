@@ -97,7 +97,7 @@ def job_provider_health(query: str = "software engineer", country: str = "us"):
     configured = set(service.configured_sources())
 
     checks = {}
-    for source in ["jsearch", "adzuna"]:
+    for source in ["jsearch", "adzuna", "google_scrape"]:
         if source not in configured:
             checks[source] = {
                 "status": "not_configured",
@@ -172,13 +172,15 @@ def search_jobs(req: JobSearchRequest, db: Session = Depends(get_db)):
         per_page=max(1, min(req.per_page, 100)),
         sources=req.sources,
         country=req.country,
+        scrape_sites=req.scrape_sites,
     )
 
     discovered_jobs = search_result.get("jobs", [])
     errors = search_result.get("errors", [])
 
     if not discovered_jobs:
-        # No-match searches are a normal outcome; return an empty list so UI can handle it gracefully.
+        if errors:
+            raise HTTPException(status_code=502, detail="; ".join(errors))
         return []
 
     ai = get_ai_service() if (req.score_results and profile) else None

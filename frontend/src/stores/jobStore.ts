@@ -37,6 +37,7 @@ export interface JobSearchFilters {
   page?: number
   per_page?: number
   country?: string
+  scrape_sites?: string[]
 }
 
 interface JobState {
@@ -105,8 +106,9 @@ export const useJobStore = create<JobState>((set) => ({
         set({ jobs: [], loading: false, error: null })
         return []
       }
-      set({ loading: false, error: detail || 'Job search failed' })
-      throw err
+      const message = detail || 'Job search failed'
+      set({ loading: false, error: message })
+      throw new Error(message)
     }
   },
 

@@ -18,10 +18,14 @@ export default function JobFeed() {
     min_fit_score: '',
     max_scored_jobs: '8',
     per_page: '20',
-    country: 'us',
+    country: 'europe',
     score_results: true,
     use_jsearch: true,
     use_adzuna: true,
+    use_google_scrape: false,
+    scrape_greenhouse: true,
+    scrape_lever: true,
+    scrape_ashby: true,
   })
   const [scoring, setScoring] = useState<number | null>(null)
 
@@ -64,12 +68,22 @@ export default function JobFeed() {
     const sources = [
       searchForm.use_jsearch ? 'jsearch' : '',
       searchForm.use_adzuna ? 'adzuna' : '',
+      searchForm.use_google_scrape ? 'google_scrape' : '',
     ].filter(Boolean)
 
     if (sources.length === 0) {
-      setSearchSummary('Select at least one source (JSearch or Adzuna).')
+      setSearchSummary('Select at least one source.')
       return
     }
+
+    // Build scrape_sites list from checkboxes
+    const scrape_sites = searchForm.use_google_scrape
+      ? [
+          searchForm.scrape_greenhouse ? 'boards.greenhouse.io' : '',
+          searchForm.scrape_lever ? 'jobs.lever.co' : '',
+          searchForm.scrape_ashby ? 'jobs.ashbyhq.com' : '',
+        ].filter(Boolean)
+      : undefined
 
     try {
       const found = await searchJobs({
@@ -84,6 +98,7 @@ export default function JobFeed() {
         score_results: searchForm.score_results,
         sources,
         country: searchForm.country.trim() || undefined,
+        scrape_sites,
       })
       if (found.length === 0) {
         setSearchSummary('Found 0 jobs. Try broader query/location, disable Remote only, or remove Min Fit Score.')
@@ -155,13 +170,26 @@ export default function JobFeed() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Country (Adzuna)</label>
-              <input
-                type="text"
+              <select
                 value={searchForm.country}
                 onChange={(e) => setSearchForm((s) => ({ ...s, country: e.target.value }))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="us"
-              />
+              >
+                <option value="us">🇺🇸 United States</option>
+                <option value="gb">🇬🇧 United Kingdom</option>
+                <option value="europe">🌍 Europe (All)</option>
+                <option value="de">🇩🇪 Germany</option>
+                <option value="fr">🇫🇷 France</option>
+                <option value="nl">🇳🇱 Netherlands</option>
+                <option value="pl">🇵🇱 Poland</option>
+                <option value="it">🇮🇹 Italy</option>
+                <option value="es">🇪🇸 Spain</option>
+                <option value="at">🇦🇹 Austria</option>
+                <option value="be">🇧🇪 Belgium</option>
+                <option value="ch">🇨🇭 Switzerland</option>
+                <option value="au">🇦🇺 Australia</option>
+                <option value="ca">🇨🇦 Canada</option>
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Min Salary</label>
@@ -253,7 +281,44 @@ export default function JobFeed() {
                 />
                 Adzuna
               </label>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={searchForm.use_google_scrape}
+                  onChange={(e) => setSearchForm((s) => ({ ...s, use_google_scrape: e.target.checked }))}
+                />
+                Google Scrape
+              </label>
             </div>
+            {searchForm.use_google_scrape && (
+              <div className="md:col-span-3 flex flex-wrap gap-4 pl-6 border-l-2 border-blue-200">
+                <span className="text-xs font-medium text-gray-500 w-full">Job boards to scrape:</span>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={searchForm.scrape_greenhouse}
+                    onChange={(e) => setSearchForm((s) => ({ ...s, scrape_greenhouse: e.target.checked }))}
+                  />
+                  Greenhouse
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={searchForm.scrape_lever}
+                    onChange={(e) => setSearchForm((s) => ({ ...s, scrape_lever: e.target.checked }))}
+                  />
+                  Lever
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={searchForm.scrape_ashby}
+                    onChange={(e) => setSearchForm((s) => ({ ...s, scrape_ashby: e.target.checked }))}
+                  />
+                  Ashby
+                </label>
+              </div>
+            )}
           </div>
         )}
 
