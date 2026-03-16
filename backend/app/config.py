@@ -16,8 +16,7 @@ class Settings(BaseSettings):
     jsearch_api_key: str = ""
     adzuna_app_id: str = ""
     adzuna_api_key: str = ""
-    google_api_key: str = ""   # Google Cloud API key (Custom Search)
-    google_cse_id: str = ""    # Google Custom Search Engine ID (cx)
+    brave_api_key: str = ""   # Brave Search API key
     database_url: str = "sqlite:///./data/app.db"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}

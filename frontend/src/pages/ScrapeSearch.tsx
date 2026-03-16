@@ -20,7 +20,7 @@ const SCRAPE_AGENTS: ScrapeAgent[] = [
     id: 'greenhouse',
     name: 'Greenhouse',
     domain: 'boards.greenhouse.io',
-    description: 'Scrape open positions from Greenhouse job boards',
+    description: 'Search open positions from Greenhouse job boards via API',
     color: 'text-green-700',
     bgColor: 'bg-green-50',
     borderColor: 'border-green-500',
@@ -30,7 +30,7 @@ const SCRAPE_AGENTS: ScrapeAgent[] = [
     id: 'lever',
     name: 'Lever',
     domain: 'jobs.lever.co',
-    description: 'Scrape listings from Lever career pages',
+    description: 'Search listings from Lever career pages via API',
     color: 'text-blue-700',
     bgColor: 'bg-blue-50',
     borderColor: 'border-blue-500',
@@ -40,7 +40,7 @@ const SCRAPE_AGENTS: ScrapeAgent[] = [
     id: 'ashby',
     name: 'Ashby',
     domain: 'jobs.ashbyhq.com',
-    description: 'Scrape job postings from Ashby boards',
+    description: 'Search job postings from Ashby boards via API',
     color: 'text-purple-700',
     bgColor: 'bg-purple-50',
     borderColor: 'border-purple-500',
@@ -78,6 +78,8 @@ const SCRAPE_AGENTS: ScrapeAgent[] = [
   },
 ]
 
+const DIRECT_ATS_AGENTS = new Set(['greenhouse', 'lever', 'ashby'])
+
 export default function ScrapeSearch() {
   const { loading, searchJobs } = useJobStore()
   const navigate = useNavigate()
@@ -91,8 +93,8 @@ export default function ScrapeSearch() {
   useEffect(() => {
     api.get('/jobs/providers/health')
       .then(({ data }) => {
-        const gs = data?.google_scrape
-        setCseConfigured(gs && gs.status !== 'not_configured')
+        const bs = data?.checks?.brave_scrape
+        setCseConfigured(bs && bs.status !== 'not_configured')
       })
       .catch(() => setCseConfigured(null))
   }, [])
@@ -118,32 +120,38 @@ export default function ScrapeSearch() {
       return
     }
 
-    const activeSites = SCRAPE_AGENTS
-      .filter((a) => selectedAgents.has(a.id) && a.available)
-      .map((a) => a.domain)
-
-    if (activeSites.length === 0) {
+    const selectedList = SCRAPE_AGENTS.filter((a) => selectedAgents.has(a.id) && a.available)
+    if (selectedList.length === 0) {
       setSearchSummary('Select at least one agent.')
       return
+    }
+
+    // Split selected agents into direct ATS sources and brave_scrape sites
+    const directSources = selectedList.filter((a) => DIRECT_ATS_AGENTS.has(a.id)).map((a) => a.id)
+    const braveSites = selectedList.filter((a) => !DIRECT_ATS_AGENTS.has(a.id)).map((a) => a.domain)
+
+    const sources = [...directSources]
+    if (braveSites.length > 0) {
+      sources.push('brave_scrape')
     }
 
     try {
       const found = await searchJobs({
         query: query.trim(),
         location: location.trim() || undefined,
-        sources: ['google_scrape'],
-        scrape_sites: activeSites,
+        sources,
+        scrape_sites: braveSites.length > 0 ? braveSites : undefined,
         score_results: scoreResults,
         max_scored_jobs: 8,
         per_page: 30,
       })
       if (found.length === 0) {
-        setSearchSummary('Found 0 jobs. Try a different query or select more agents.')
+        setSearchSummary('Found 0 jobs. Try a different query.')
       } else {
         setSearchSummary(`Found ${found.length} job(s). View them in Jobs.`)
       }
     } catch (err: any) {
-      setSearchSummary(err?.message || 'Scrape failed. Try again.')
+      setSearchSummary(err?.message || 'Search failed. Try again.')
     }
   }
 
@@ -157,34 +165,31 @@ export default function ScrapeSearch() {
           <ArrowLeft size={20} />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Scrape Search</h1>
-          <p className="text-gray-500 mt-1">Select agents and scrape job boards directly</p>
+          <h1 className="text-2xl font-bold text-gray-900">Board Search</h1>
+          <p className="text-gray-500 mt-1">Search job boards directly via their APIs</p>
         </div>
       </div>
 
-      {/* CSE setup banner */}
+      {/* Brave Search setup banner */}
       {cseConfigured === false && (
         <div className="bg-amber-50 border border-amber-300 rounded-xl p-5 flex gap-4">
           <AlertTriangle size={20} className="text-amber-600 mt-0.5 shrink-0" />
           <div className="space-y-2 text-sm">
-            <p className="font-semibold text-amber-900">Google Custom Search API not configured</p>
-            <p className="text-amber-800">Scrape search uses Google's Custom Search API (free, 100 queries/day). Two steps to enable it:</p>
+            <p className="font-semibold text-amber-900">Brave Search API not configured</p>
+            <p className="text-amber-800">Brave Search is optional and adds broad web discovery alongside direct board APIs. To enable it:</p>
             <ol className="list-decimal ml-4 space-y-1 text-amber-800">
               <li>
-                Create an API key at{' '}
-                <span className="font-mono bg-amber-100 px-1 rounded">console.cloud.google.com/apis/credentials</span>
-                {' '}and enable <strong>Custom Search API</strong>.
+                Go to{' '}
+                <span className="font-mono bg-amber-100 px-1 rounded">https://api.search.brave.com/</span>
+                {' '}and sign up for a free account.
               </li>
               <li>
-                Create a Search Engine at{' '}
-                <span className="font-mono bg-amber-100 px-1 rounded">programmablesearchengine.google.com</span>
-                {' '}— set it to search the entire web, copy the <code>cx=</code> value.
+                Copy your API key and add it to{' '}
+                <span className="font-mono bg-amber-100 px-1 rounded">backend/.env</span>
               </li>
             </ol>
-            <p className="text-amber-800">Then add to <span className="font-mono bg-amber-100 px-1 rounded">backend/.env</span>:</p>
             <pre className="bg-amber-100 text-amber-900 rounded-lg p-3 text-xs font-mono whitespace-pre-wrap">
-{`GOOGLE_API_KEY=your-api-key
-GOOGLE_CSE_ID=your-cx-value`}
+{`BRAVE_API_KEY=your-brave-api-key`}
             </pre>
           </div>
         </div>
@@ -214,6 +219,7 @@ GOOGLE_CSE_ID=your-cx-value`}
             />
           </div>
         </div>
+
         <div className="mt-4">
           <label className="flex items-center gap-2 text-sm text-gray-700">
             <input
@@ -228,7 +234,7 @@ GOOGLE_CSE_ID=your-cx-value`}
 
       {/* Agent cards */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Scrape Agents</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Search Agents</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {SCRAPE_AGENTS.map((agent) => {
             const isSelected = selectedAgents.has(agent.id)

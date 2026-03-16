@@ -3,6 +3,54 @@ import { useJobStore, type Job } from '../stores/jobStore'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Plus, Star, ExternalLink, Loader2, Trash2 } from 'lucide-react'
 
+function sanitizeText(value: string | null | undefined) {
+  return (value || '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function readableRemoteType(remoteType: string) {
+  if (!remoteType) return ''
+  if (remoteType === 'onsite') return 'On-site'
+  return remoteType.charAt(0).toUpperCase() + remoteType.slice(1)
+}
+
+function salaryLabel(job: Job) {
+  const hasMin = job.salary_min !== null && job.salary_min !== undefined
+  const hasMax = job.salary_max !== null && job.salary_max !== undefined
+  if (!hasMin && !hasMax) return ''
+
+  const fmt = (value: number | null) => (value === null ? '' : `$${new Intl.NumberFormat('en-US').format(value)}`)
+  if (hasMin && hasMax) return `${fmt(job.salary_min)} - ${fmt(job.salary_max)}`
+  if (hasMin) return `From ${fmt(job.salary_min)}`
+  return `Up to ${fmt(job.salary_max)}`
+}
+
+function displayJobTitle(job: Job) {
+  const raw = sanitizeText(job.title)
+  const lowered = raw.toLowerCase()
+  if (raw && lowered !== 'embed') return raw
+
+  if (job.url) {
+    try {
+      const parts = new URL(job.url).pathname.split('/').filter(Boolean)
+      const slug = parts.at(-1) || parts.at(-2)
+      if (slug && slug.length > 2) {
+        return slug.replace(/[-_]/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
+      }
+    } catch {
+      // Invalid URL: use fallback title below.
+    }
+  }
+
+  return 'Open Position'
+}
+
 export default function JobsList() {
   const { jobs, loading, error, fetchJobs, createJob, scoreJob, deleteJob } = useJobStore()
   const [showForm, setShowForm] = useState(false)
@@ -177,18 +225,32 @@ function JobCard({
   onDelete: (id: number) => void
   scoring: boolean
 }) {
+  const salary = salaryLabel(job)
+  const remote = readableRemoteType(job.remote_type)
+  const descriptionPreview = sanitizeText(job.description)
+
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 hover:border-gray-300 transition-colors">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h3 className="font-semibold text-gray-900">{job.title}</h3>
+            <h3 className="font-semibold text-gray-900">{displayJobTitle(job)}</h3>
             {job.fit_score !== null && <FitScoreBadge score={job.fit_score} />}
           </div>
           <p className="text-sm text-gray-500 mt-1">
             {job.company}
             {job.location && ` · ${job.location}`}
           </p>
+          {(remote || salary) && (
+            <p className="text-xs text-gray-500 mt-1">
+              {remote}
+              {remote && salary ? ' · ' : ''}
+              {salary}
+            </p>
+          )}
+          {descriptionPreview && (
+            <p className="text-xs text-gray-600 mt-2 line-clamp-3">{descriptionPreview}</p>
+          )}
           {job.fit_reasoning && (
             <p className="text-xs text-gray-500 mt-2 line-clamp-2">{job.fit_reasoning}</p>
           )}
@@ -232,6 +294,12 @@ function JobCard({
       <div className="flex items-center gap-2 mt-3">
         <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 capitalize">{job.status.replace('_', ' ')}</span>
         <span className="text-xs text-gray-400">{job.source}</span>
+        {job.link_type === 'expired' && (
+          <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">Expired</span>
+        )}
+        {job.link_type === 'board' && (
+          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Job Board</span>
+        )}
         {job.date_saved && <span className="text-xs text-gray-400">Saved {new Date(job.date_saved).toLocaleDateString()}</span>}
       </div>
     </div>

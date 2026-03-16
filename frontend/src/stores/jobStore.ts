@@ -20,6 +20,7 @@ export interface Job {
   date_applied: string | null
   next_follow_up: string | null
   notes: string | null
+  link_type: string | null
   created_at: string | null
   updated_at: string | null
 }
@@ -38,6 +39,7 @@ export interface JobSearchFilters {
   per_page?: number
   country?: string
   scrape_sites?: string[]
+  company_slugs?: string[]
 }
 
 interface JobState {

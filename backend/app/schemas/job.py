@@ -39,6 +39,7 @@ class JobResponse(BaseModel):
     date_applied: Optional[datetime] = None
     next_follow_up: Optional[datetime] = None
     notes: Optional[str] = None
+    link_type: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -57,5 +58,6 @@ class JobSearchRequest(BaseModel):
     max_scored_jobs: int = 8
     country: Optional[str] = None  # Adzuna country code, e.g. us, gb, de
     scrape_sites: Optional[list[str]] = None  # e.g. ["boards.greenhouse.io", "jobs.lever.co"]
+    company_slugs: Optional[list[str]] = None  # e.g. ["stripe", "figma"] for direct ATS search
     page: int = 1
     per_page: int = 20

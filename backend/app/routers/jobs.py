@@ -97,7 +97,7 @@ def job_provider_health(query: str = "software engineer", country: str = "us"):
     configured = set(service.configured_sources())
 
     checks = {}
-    for source in ["jsearch", "adzuna", "google_scrape"]:
+    for source in ["jsearch", "adzuna", "brave_scrape", "greenhouse", "lever", "ashby"]:
         if source not in configured:
             checks[source] = {
                 "status": "not_configured",
@@ -209,6 +209,7 @@ def search_jobs(req: JobSearchRequest, db: Session = Depends(get_db)):
             job.url = url or job.url
             job.external_id = external_id or job.external_id
             job.source = source or job.source
+            job.link_type = item.get("link_type") or job.link_type
             if not job.status:
                 job.status = "discovered"
         else:
@@ -223,6 +224,7 @@ def search_jobs(req: JobSearchRequest, db: Session = Depends(get_db)):
                 salary_max=item.get("salary_max"),
                 description=item.get("description") or "",
                 url=url,
+                link_type=item.get("link_type"),
                 status="discovered",
             )
             db.add(job)

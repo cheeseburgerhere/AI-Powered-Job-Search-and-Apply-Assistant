@@ -25,6 +25,7 @@ class Job(Base):
     date_applied = Column(DateTime(timezone=True), nullable=True)
     next_follow_up = Column(DateTime(timezone=True), nullable=True)
     notes = Column(Text, nullable=True)
+    link_type = Column(String, nullable=True)  # "job", "board", "expired"
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
