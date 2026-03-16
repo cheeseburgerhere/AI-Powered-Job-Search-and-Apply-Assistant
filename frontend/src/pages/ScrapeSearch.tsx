@@ -78,8 +78,6 @@ const SCRAPE_AGENTS: ScrapeAgent[] = [
   },
 ]
 
-const DIRECT_ATS_AGENTS = new Set(['greenhouse', 'lever', 'ashby'])
-
 export default function ScrapeSearch() {
   const { loading, searchJobs } = useJobStore()
   const navigate = useNavigate()
@@ -126,20 +124,13 @@ export default function ScrapeSearch() {
       return
     }
 
-    // Split selected agents into direct ATS sources and brave_scrape sites
-    const directSources = selectedList.filter((a) => DIRECT_ATS_AGENTS.has(a.id)).map((a) => a.id)
-    const braveSites = selectedList.filter((a) => !DIRECT_ATS_AGENTS.has(a.id)).map((a) => a.domain)
-
-    const sources = [...directSources]
-    if (braveSites.length > 0) {
-      sources.push('brave_scrape')
-    }
+    const braveSites = selectedList.map((a) => a.domain)
 
     try {
       const found = await searchJobs({
         query: query.trim(),
         location: location.trim() || undefined,
-        sources,
+        sources: ['brave_scrape'],
         scrape_sites: braveSites.length > 0 ? braveSites : undefined,
         score_results: scoreResults,
         max_scored_jobs: 8,

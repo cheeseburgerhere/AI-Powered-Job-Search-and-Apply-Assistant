@@ -3,10 +3,17 @@
 import re
 import urllib.error
 import urllib.request
+import urllib.parse
 
 
 def check_link_type(url: str) -> str:
     """Fetch a job page and classify it as 'job', 'board', or 'expired'."""
+    # Use path-based rules first for common ATS domains. They are more reliable
+    # than content heuristics and avoid mislabeling valid job pages as boards.
+    path_based = _classify_known_ats_path(url)
+    if path_based:
+        return path_based
+
     try:
         body = _http_get_text(url)
     except Exception:
@@ -35,6 +42,42 @@ def check_link_type(url: str) -> str:
         return "board"
 
     return "job"
+
+
+def _classify_known_ats_path(url: str) -> str | None:
+    """Classify known ATS URLs from their path shape."""
+    try:
+        parsed = urllib.parse.urlparse(url)
+    except Exception:
+        return None
+
+    host = (parsed.netloc or "").lower()
+    path_parts = [p for p in (parsed.path or "").strip("/").split("/") if p]
+
+    if not host or not path_parts:
+        return None
+
+    if "boards.greenhouse.io" in host:
+        # /{company}/jobs/{id} is a single posting; /{company} is a board listing.
+        if len(path_parts) >= 3 and path_parts[1].lower() == "jobs":
+            return "job"
+        return "board"
+
+    if "jobs.lever.co" in host:
+        # /{company}/{jobId} is a single posting; /{company} is a board listing.
+        if len(path_parts) >= 2:
+            return "job"
+        return "board"
+
+    if "jobs.ashbyhq.com" in host:
+        # /{company}/jobs/{slug} is a single posting; /{company}/jobs is a board.
+        if len(path_parts) >= 3 and path_parts[1].lower() == "jobs":
+            return "job"
+        if len(path_parts) >= 2 and path_parts[1].lower() == "jobs":
+            return "board"
+        return "board"
+
+    return None
 
 
 def _http_get_text(url: str) -> str:

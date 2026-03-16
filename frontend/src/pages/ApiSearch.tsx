@@ -25,6 +25,11 @@ export default function ApiSearch() {
   const handleSearch = async () => {
     const query = searchForm.query.trim()
 
+    if (!query) {
+      setSearchSummary('Enter a search query.')
+      return
+    }
+
     const sources = [
       searchForm.use_jsearch ? 'jsearch' : '',
       searchForm.use_adzuna ? 'adzuna' : '',
@@ -37,7 +42,7 @@ export default function ApiSearch() {
 
     try {
       const found = await searchJobs({
-        query: query || undefined,
+        query,
         location: searchForm.location.trim() || undefined,
         remote_only: searchForm.remote_only,
         salary_min: searchForm.salary_min ? parseInt(searchForm.salary_min) : undefined,
@@ -54,8 +59,8 @@ export default function ApiSearch() {
       } else {
         setSearchSummary(`Found ${found.length} job(s). View them in Jobs.`)
       }
-    } catch {
-      setSearchSummary('Search failed. Check provider keys and conditions.')
+    } catch (err: any) {
+      setSearchSummary(err?.message || 'Search failed. Check provider keys and conditions.')
     }
   }
 
