@@ -17,16 +17,6 @@ interface ScrapeAgent {
 
 const SCRAPE_AGENTS: ScrapeAgent[] = [
   {
-    id: 'greenhouse',
-    name: 'Greenhouse',
-    domain: 'boards.greenhouse.io',
-    description: 'Search open positions from Greenhouse job boards via API',
-    color: 'text-green-700',
-    bgColor: 'bg-green-50',
-    borderColor: 'border-green-500',
-    available: true,
-  },
-  {
     id: 'lever',
     name: 'Lever',
     domain: 'jobs.lever.co',
@@ -34,6 +24,16 @@ const SCRAPE_AGENTS: ScrapeAgent[] = [
     color: 'text-blue-700',
     bgColor: 'bg-blue-50',
     borderColor: 'border-blue-500',
+    available: true,
+  },
+  {
+    id: 'greenhouse',
+    name: 'Greenhouse',
+    domain: 'boards.greenhouse.io',
+    description: 'Search open positions from Greenhouse job boards via API',
+    color: 'text-green-700',
+    bgColor: 'bg-green-50',
+    borderColor: 'border-green-500',
     available: true,
   },
   {
@@ -83,7 +83,7 @@ export default function ScrapeSearch() {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [location, setLocation] = useState('')
-  const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set(['greenhouse']))
+  const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set(['lever']))
   const [searchSummary, setSearchSummary] = useState('')
   const [scoreResults, setScoreResults] = useState(true)
   const [cseConfigured, setCseConfigured] = useState<boolean | null>(null)
