@@ -20,6 +20,7 @@ interface CoverLetterState {
   fetchLetters: (jobId: number) => Promise<void>
   generate: (jobId: number) => Promise<CoverLetter>
   refine: (letterId: number, feedback: string) => Promise<CoverLetter>
+  updateContent: (letterId: number, content: string) => Promise<CoverLetter>
   updateStatus: (letterId: number, status: string) => Promise<void>
 }
 
@@ -58,6 +59,21 @@ export const useCoverLetterStore = create<CoverLetterState>((set) => ({
       return data
     } catch (err: any) {
       set({ error: err.response?.data?.detail || 'Refinement failed', loading: false })
+      throw err
+    }
+  },
+
+  updateContent: async (letterId: number, content: string) => {
+    set({ loading: true, error: null })
+    try {
+      const { data } = await api.put(`/cover-letters/${letterId}`, { content })
+      set((s) => ({
+        letters: s.letters.map((l) => (l.id === letterId ? data : l)),
+        loading: false,
+      }))
+      return data
+    } catch (err: any) {
+      set({ error: err.response?.data?.detail || 'Save failed', loading: false })
       throw err
     }
   },

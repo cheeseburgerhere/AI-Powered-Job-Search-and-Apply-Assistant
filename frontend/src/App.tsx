@@ -7,6 +7,7 @@ import JobsList from './pages/JobsList'
 import FindLanding from './pages/FindLanding'
 import ApiSearch from './pages/ApiSearch'
 import ScrapeSearch from './pages/ScrapeSearch'
+import JobBoardAgent from './pages/JobBoardAgent'
 import CoverLetterEditor from './pages/CoverLetterEditor'
 import Tracker from './pages/Tracker'
 
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/jobs/find" element={<FindLanding />} />
           <Route path="/jobs/find/api" element={<ApiSearch />} />
           <Route path="/jobs/find/scrape" element={<ScrapeSearch />} />
+          <Route path="/job-board-agent" element={<JobBoardAgent />} />
           <Route path="/cover-letters" element={<CoverLetterEditor />} />
           <Route path="/tracker" element={<Tracker />} />
         </Route>

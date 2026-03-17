@@ -2,14 +2,17 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useCoverLetterStore } from '../stores/coverLetterStore'
 import { useJobStore } from '../stores/jobStore'
-import { Loader2, Copy, Check, RefreshCw, CheckCircle2 } from 'lucide-react'
+import { Loader2, Copy, Check, RefreshCw, CheckCircle2, Pencil, Save, X } from 'lucide-react'
 
 export default function CoverLetterEditor() {
   const [searchParams] = useSearchParams()
   const jobIdParam = searchParams.get('job_id')
   const { jobs, fetchJobs } = useJobStore()
-  const { letters, loading, error, fetchLetters, generate, refine, updateStatus } = useCoverLetterStore()
+  const { letters, loading, error, fetchLetters, generate, refine, updateContent, updateStatus } = useCoverLetterStore()
   const [selectedJobId, setSelectedJobId] = useState<number | null>(jobIdParam ? parseInt(jobIdParam) : null)
+  const [selectedLetterId, setSelectedLetterId] = useState<number | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedContent, setEditedContent] = useState('')
   const [feedback, setFeedback] = useState('')
   const [copied, setCopied] = useState(false)
 
@@ -23,31 +26,81 @@ export default function CoverLetterEditor() {
     }
   }, [selectedJobId, fetchLetters])
 
+  useEffect(() => {
+    if (letters.length === 0) {
+      setSelectedLetterId(null)
+      setIsEditing(false)
+      setEditedContent('')
+      return
+    }
+
+    const selectedStillExists = selectedLetterId != null && letters.some((l) => l.id === selectedLetterId)
+    if (!selectedStillExists) {
+      setSelectedLetterId(letters[0].id)
+    }
+  }, [letters, selectedLetterId])
+
   const selectedJob = jobs.find((j) => j.id === selectedJobId)
-  const latestLetter = letters.length > 0 ? letters[0] : null
+  const selectedLetter = letters.find((l) => l.id === selectedLetterId) || letters[0] || null
+
+  useEffect(() => {
+    if (!selectedLetter) {
+      setEditedContent('')
+      setIsEditing(false)
+      return
+    }
+
+    setEditedContent(selectedLetter.content)
+    setIsEditing(false)
+  }, [selectedLetter?.id])
+
+  useEffect(() => {
+    if (selectedJobId == null && selectedLetter) {
+      setSelectedJobId(selectedLetter.job_id)
+    }
+  }, [selectedJobId, selectedLetter])
 
   const handleGenerate = async () => {
-    if (!selectedJobId) return
-    await generate(selectedJobId)
+    const targetJobId = selectedJobId ?? selectedLetter?.job_id
+    if (!targetJobId) return
+
+    const generated = await generate(targetJobId)
+    if (selectedJobId !== targetJobId) {
+      setSelectedJobId(targetJobId)
+    }
+    setSelectedLetterId(generated.id)
   }
 
   const handleRefine = async () => {
-    if (!latestLetter || !feedback.trim()) return
-    await refine(latestLetter.id, feedback)
+    if (!selectedLetter || !feedback.trim()) return
+    const refined = await refine(selectedLetter.id, feedback)
+    setSelectedLetterId(refined.id)
     setFeedback('')
   }
 
   const handleCopy = () => {
-    if (!latestLetter) return
-    navigator.clipboard.writeText(latestLetter.content)
+    if (!selectedLetter) return
+    navigator.clipboard.writeText(selectedLetter.content)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
   const handleMarkReady = async () => {
-    if (!latestLetter) return
-    await updateStatus(latestLetter.id, latestLetter.status === 'ready' ? 'draft' : 'ready')
+    if (!selectedLetter) return
+    await updateStatus(selectedLetter.id, selectedLetter.status === 'ready' ? 'draft' : 'ready')
     if (selectedJobId) fetchLetters(selectedJobId)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!selectedLetter || !editedContent.trim()) return
+    await updateContent(selectedLetter.id, editedContent)
+    setIsEditing(false)
+  }
+
+  const handleCancelEdit = () => {
+    if (!selectedLetter) return
+    setEditedContent(selectedLetter.content)
+    setIsEditing(false)
   }
 
   return (
@@ -84,7 +137,7 @@ export default function CoverLetterEditor() {
           </div>
         )}
 
-        {selectedJobId && !latestLetter && (
+        {selectedJobId && !selectedLetter && (
           <button
             onClick={handleGenerate}
             disabled={loading}
@@ -97,7 +150,7 @@ export default function CoverLetterEditor() {
       </div>
 
       {/* Cover Letter Display */}
-      {latestLetter && (
+      {selectedLetter && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Letter content */}
           <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl p-6">
@@ -105,38 +158,76 @@ export default function CoverLetterEditor() {
               <div className="flex items-center gap-3">
                 <h2 className="text-lg font-semibold">Cover Letter</h2>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                  v{latestLetter.version}
+                  v{selectedLetter.version}
                 </span>
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full ${
-                    latestLetter.status === 'ready'
+                    selectedLetter.status === 'ready'
                       ? 'bg-green-100 text-green-700'
                       : 'bg-yellow-100 text-yellow-700'
                   }`}
                 >
-                  {latestLetter.status}
+                  {selectedLetter.status}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleCopy}
+                  disabled={isEditing}
                   className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-1"
                 >
                   {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
+                {!isEditing ? (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="px-3 py-1.5 text-xs font-medium bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 flex items-center gap-1"
+                  >
+                    <Pencil size={14} />
+                    Edit
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleSaveEdit}
+                      disabled={loading || !editedContent.trim()}
+                      className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {loading ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                      Save
+                    </button>
+                    <button
+                      onClick={handleCancelEdit}
+                      className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-1"
+                    >
+                      <X size={14} />
+                      Cancel
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={handleMarkReady}
+                  disabled={isEditing}
                   className="px-3 py-1.5 text-xs font-medium bg-green-50 text-green-700 rounded-lg hover:bg-green-100 flex items-center gap-1"
                 >
                   <CheckCircle2 size={14} />
-                  {latestLetter.status === 'ready' ? 'Mark Draft' : 'Mark Ready'}
+                  {selectedLetter.status === 'ready' ? 'Mark Draft' : 'Mark Ready'}
                 </button>
               </div>
             </div>
-            <div className="prose prose-sm max-w-none whitespace-pre-wrap text-gray-800 leading-relaxed">
-              {latestLetter.content}
-            </div>
+            {isEditing ? (
+              <textarea
+                value={editedContent}
+                onChange={(e) => setEditedContent(e.target.value)}
+                rows={22}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            ) : (
+              <div className="prose prose-sm max-w-none whitespace-pre-wrap text-slate-200 leading-relaxed">
+                {selectedLetter.content}
+              </div>
+            )}
           </div>
 
           {/* Refinement panel */}
@@ -164,7 +255,7 @@ export default function CoverLetterEditor() {
               <h3 className="font-semibold text-sm mb-3">Actions</h3>
               <button
                 onClick={handleGenerate}
-                disabled={loading}
+                disabled={loading || !(selectedJobId ?? selectedLetter?.job_id)}
                 className="w-full px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
@@ -178,10 +269,14 @@ export default function CoverLetterEditor() {
                 <h3 className="font-semibold text-sm mb-3">Version History</h3>
                 <div className="space-y-2">
                   {letters.map((l) => (
-                    <div
+                    <button
                       key={l.id}
-                      className={`text-xs p-2 rounded-lg border ${
-                        l.id === latestLetter.id ? 'border-blue-200 bg-blue-50' : 'border-gray-100'
+                      type="button"
+                      onClick={() => setSelectedLetterId(l.id)}
+                      className={`w-full text-left text-xs p-2 rounded-lg border transition-colors ${
+                        l.id === selectedLetter.id
+                          ? 'border-blue-200 bg-blue-50'
+                          : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
                       }`}
                     >
                       <span className="font-medium">v{l.version}</span>
@@ -189,7 +284,7 @@ export default function CoverLetterEditor() {
                       {l.feedback && (
                         <p className="text-gray-400 mt-1 truncate">"{l.feedback}"</p>
                       )}
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>

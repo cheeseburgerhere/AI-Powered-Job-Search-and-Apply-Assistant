@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import create_tables
-from app.routers import profile, jobs, cover_letters, tracker
+from app.routers import profile, jobs, cover_letters, tracker, job_boards
 from app.config import get_settings
 
 app = FastAPI(title="AI Job Assistant", version="0.1.0")
@@ -16,6 +16,7 @@ app.add_middleware(
 
 app.include_router(profile.router)
 app.include_router(jobs.router)
+app.include_router(job_boards.router)
 app.include_router(cover_letters.router)
 app.include_router(tracker.router)
 

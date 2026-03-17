@@ -8,6 +8,7 @@ from app.models.profile import Profile
 from app.schemas.cover_letter import (
     CoverLetterGenerate,
     CoverLetterRefine,
+    CoverLetterContentUpdate,
     CoverLetterStatusUpdate,
     CoverLetterResponse,
 )
@@ -89,6 +90,21 @@ def refine_cover_letter(letter_id: int, req: CoverLetterRefine, db: Session = De
     db.commit()
     db.refresh(new_letter)
     return new_letter
+
+
+@router.put("/{letter_id}", response_model=CoverLetterResponse)
+def update_cover_letter_content(letter_id: int, req: CoverLetterContentUpdate, db: Session = Depends(get_db)):
+    letter = db.query(CoverLetter).filter(CoverLetter.id == letter_id).first()
+    if not letter:
+        raise HTTPException(status_code=404, detail="Cover letter not found")
+
+    if not req.content.strip():
+        raise HTTPException(status_code=400, detail="Content cannot be empty")
+
+    letter.content = req.content
+    db.commit()
+    db.refresh(letter)
+    return letter
 
 
 @router.put("/{letter_id}/status", response_model=CoverLetterResponse)

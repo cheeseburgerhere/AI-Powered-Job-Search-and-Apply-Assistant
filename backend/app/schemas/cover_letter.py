@@ -15,6 +15,10 @@ class CoverLetterStatusUpdate(BaseModel):
     status: str  # "draft" or "ready"
 
 
+class CoverLetterContentUpdate(BaseModel):
+    content: str
+
+
 class CoverLetterResponse(BaseModel):
     id: int
     job_id: int
