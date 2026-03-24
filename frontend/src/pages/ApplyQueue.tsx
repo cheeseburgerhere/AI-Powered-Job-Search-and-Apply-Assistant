@@ -390,7 +390,7 @@ export default function ApplyQueue() {
                       type="button"
                       onClick={() => toggleTask(task.id)}
                       className={`w-full text-left px-3 py-3 flex items-center gap-3 transition-colors ${
-                        task.done ? 'bg-gray-50/60 hover:bg-gray-50' : 'hover:bg-gray-50'
+                        task.done ? 'bg-slate-800/55 hover:bg-slate-800/70' : 'hover:bg-slate-800/45'
                       }`}
                     >
                       <span className="shrink-0 w-5 h-5 flex items-center justify-center">
@@ -402,10 +402,10 @@ export default function ApplyQueue() {
                       </span>
                       <div className="flex-1 min-w-0">
                         <span className={`text-sm ${
-                          task.done ? 'text-gray-400 line-through' : 'text-gray-800'
+                          task.done ? 'text-slate-400 line-through' : 'text-slate-100'
                         }`}>{task.title}</span>
                       </div>
-                      <span className="shrink-0 text-xs text-gray-400">{idx + 1}</span>
+                      <span className="shrink-0 text-xs text-slate-300">{idx + 1}</span>
                     </button>
                   ))}
                 </div>

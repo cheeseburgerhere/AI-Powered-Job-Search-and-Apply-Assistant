@@ -60,6 +60,10 @@ body {
   color: var(--text-secondary) !important;
 }
 
+.text-gray-800 {
+  color: #cbd5e1 !important;
+}
+
 .bg-blue-50 {
   background-color: rgba(37, 99, 235, 0.18) !important;
 }
@@ -119,6 +123,10 @@ body {
   color: #fcd34d !important;
 }
 
+.text-amber-800 {
+  color: #fbbf24 !important;
+}
+
 .text-red-700,
 .text-red-600 {
   color: #fca5a5 !important;
@@ -136,4 +144,3 @@ input::placeholder,
 textarea::placeholder {
   color: #64748b !important;
 }
-

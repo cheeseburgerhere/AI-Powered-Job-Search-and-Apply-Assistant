@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Briefcase, Search, Send } from 'lucide-react'
+import { Briefcase, Search } from 'lucide-react'
 
 export default function JobsLanding() {
   const navigate = useNavigate()
@@ -9,7 +9,7 @@ export default function JobsLanding() {
       <h1 className="text-3xl font-bold text-gray-900 mb-2">Jobs</h1>
       <p className="text-gray-500 mb-12">What would you like to do?</p>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-5xl">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
         <button
           onClick={() => navigate('/jobs/list')}
           className="group flex flex-col items-center justify-center gap-4 bg-white border-2 border-gray-200 rounded-2xl p-12 hover:border-blue-500 hover:shadow-lg transition-all cursor-pointer"
@@ -36,7 +36,7 @@ export default function JobsLanding() {
           </div>
         </button>
 
-        <button
+        {/* <button
           onClick={() => navigate('/apply')}
           className="group flex flex-col items-center justify-center gap-4 bg-white border-2 border-gray-200 rounded-2xl p-12 hover:border-indigo-500 hover:shadow-lg transition-all cursor-pointer"
         >
@@ -47,7 +47,7 @@ export default function JobsLanding() {
             <h2 className="text-xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">Apply</h2>
             <p className="text-sm text-gray-500 mt-1">Run assisted applications queue</p>
           </div>
-        </button>
+        </button> */}
       </div>
     </div>
   )
