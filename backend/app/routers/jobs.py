@@ -65,16 +65,29 @@ def create_job(job_data: JobCreate, db: Session = Depends(get_db)):
         salary_min=job_data.salary_min,
         salary_max=job_data.salary_max,
         source="manual",
-        status="interested",
+        status=job_data.status or "interested",
     )
     db.add(job)
     db.commit()
     db.refresh(job)
 
     # Create initial tracker event
-    event = TrackerEvent(job_id=job.id, from_status="", to_status="interested")
+    event = TrackerEvent(job_id=job.id, from_status="", to_status=job.status)
     db.add(event)
     db.commit()
+
+    # Save cover letter if provided
+    if job_data.cover_letter:
+        from app.models.cover_letter import CoverLetter
+        letter = CoverLetter(
+            job_id=job.id,
+            version=1,
+            content=job_data.cover_letter,
+            status="draft",
+        )
+        db.add(letter)
+        db.commit()
+
     return job
 
 

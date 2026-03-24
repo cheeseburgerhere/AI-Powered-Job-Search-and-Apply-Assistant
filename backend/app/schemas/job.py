@@ -12,6 +12,8 @@ class JobCreate(BaseModel):
     remote_type: Optional[str] = None
     salary_min: Optional[int] = None
     salary_max: Optional[int] = None
+    status: Optional[str] = None
+    cover_letter: Optional[str] = None
 
 
 class JobUpdate(BaseModel):
