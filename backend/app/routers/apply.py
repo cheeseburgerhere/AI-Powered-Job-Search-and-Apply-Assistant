@@ -5,7 +5,7 @@ from app.database import get_db
 from app.models.cover_letter import CoverLetter
 from app.models.job import Job
 from app.models.profile import Profile
-from app.schemas.apply import ApplyPlanResponse, ApplyFromLinkRequest, ApplyFromLinkResponse, JobDetailsFromLink
+from app.schemas.apply import ApplyPlanResponse, ApplyFromLinkRequest, ApplyFromLinkResponse, JobDetailsFromLink, ScrapeDebugResponse
 from app.services.apply_planner import build_apply_plan
 from app.services.ai_service import get_ai_service
 from app.services.link_scraper import scrape_job_from_url
@@ -30,6 +30,42 @@ def generate_apply_plan(job_id: int, db: Session = Depends(get_db)):
     )
 
     return build_apply_plan(job=job, profile=profile, cover_letter=cover_letter)
+
+
+@router.post("/scrape/debug", response_model=ScrapeDebugResponse)
+async def scrape_debug(request: ApplyFromLinkRequest):
+    """
+    Debug endpoint showing the full scrape result including raw text,
+    extraction method, confidence, and Brave results.
+    """
+    try:
+        job_details = await scrape_job_from_url(request.url, "")
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Failed to scrape job posting: {str(exc)}")
+
+    # Fetch company information
+    company_info = ""
+    try:
+        company_info = fetch_company_info(job_details["company"])
+    except Exception:
+        pass
+
+    return ScrapeDebugResponse(
+        url=request.url,
+        title=job_details["title"],
+        company=job_details["company"],
+        description=job_details["description"],
+        location=job_details.get("location", ""),
+        salary=job_details.get("salary", ""),
+        employment_type=job_details.get("employment_type", ""),
+        company_info=company_info,
+        extraction_method=job_details.get("extraction_method", ""),
+        confidence=job_details.get("confidence", 0.0),
+        raw_text=job_details.get("raw_text", ""),
+        brave_result=job_details.get("brave_result", {}),
+        html_length=job_details.get("html_length", 0),
+        scraper_used=job_details.get("extraction_method", ""),
+    )
 
 
 @router.post("/scrape", response_model=JobDetailsFromLink)

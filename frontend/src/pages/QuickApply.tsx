@@ -33,6 +33,7 @@ export default function QuickApply() {
   const [editingCoverLetter, setEditingCoverLetter] = useState(false)
   const [savingApply, setSavingApply] = useState(false)
   const [copyFeedback, setCopyFeedback] = useState('')
+  const [isScraping, setIsScraping] = useState(false)
 
   // Step 1: Extract job details from URL
   const handleScrapeJob = useCallback(async () => {
@@ -43,6 +44,7 @@ export default function QuickApply() {
 
     setCurrentStep('confirming')
     setError('')
+    setIsScraping(true)
 
     try {
       const response = await fetch('/api/apply/scrape', {
@@ -61,7 +63,8 @@ export default function QuickApply() {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to scrape job details'
       setError(message)
-      setCurrentStep('input')
+    } finally {
+      setIsScraping(false)
     }
   }, [inputLink])
 
@@ -194,7 +197,7 @@ export default function QuickApply() {
       )}
 
       {/* Step 1: Input Link */}
-      {currentStep === 'input' && (
+      {(currentStep === 'input' || (currentStep === 'confirming' && !jobDetails)) && (
         <section className="bg-white border border-gray-200 rounded-xl p-8 max-w-2xl mx-auto">
           <div className="space-y-4">
             <div>
@@ -226,11 +229,20 @@ export default function QuickApply() {
 
             <button
               onClick={handleScrapeJob}
-              disabled={!inputLink.trim()}
+              disabled={!inputLink.trim() || isScraping}
               className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
-              <Send size={18} />
-              Extract Job Details
+              {isScraping ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Extracting Job Details...
+                </>
+              ) : (
+                <>
+                  <Send size={18} />
+                  Extract Job Details
+                </>
+              )}
             </button>
           </div>
         </section>

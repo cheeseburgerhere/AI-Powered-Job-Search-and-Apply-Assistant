@@ -29,3 +29,21 @@ class ApplyFromLinkResponse(BaseModel):
     job: JobDetailsFromLink
     cover_letter: str
     company_info: str
+
+
+class ScrapeDebugResponse(BaseModel):
+    url: str
+    title: str
+    company: str
+    description: str
+    location: str = ""
+    salary: str = ""
+    employment_type: str = ""
+    company_info: str = ""
+    extraction_method: str = ""
+    confidence: float = 0.0
+    raw_text: str = ""
+    brave_result: dict = {}
+    html_length: int = 0
+    scraper_used: str = ""
+
