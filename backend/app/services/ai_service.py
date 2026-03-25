@@ -212,10 +212,20 @@ class AIService:
         jd_text: str,
         company: str,
         title: str,
+        company_website: str = "",
+        company_context: str = "",
     ) -> str:
         from app.prompts.cover_letter import build_cover_letter_prompt
 
-        system, user = build_cover_letter_prompt(profile_text, voice_profile, jd_text, company, title)
+        system, user = build_cover_letter_prompt(
+            profile_text,
+            voice_profile,
+            jd_text,
+            company,
+            title,
+            company_website,
+            company_context,
+        )
         return self._call(system, user, speed="general")
 
     def refine_cover_letter(self, current_letter: str, feedback: str) -> str:

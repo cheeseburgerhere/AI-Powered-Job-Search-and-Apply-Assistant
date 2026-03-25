@@ -15,6 +15,7 @@ from app.schemas.cover_letter import (
 )
 from app.services.resume_parser import profile_to_text
 from app.services.ai_service import get_ai_service
+from app.services.company_info import fetch_company_info
 
 router = APIRouter(prefix="/api/cover-letters", tags=["cover-letters"])
 
@@ -30,6 +31,10 @@ def generate_cover_letter(req: CoverLetterGenerate, db: Session = Depends(get_db
         raise HTTPException(status_code=400, detail="Create a profile first")
 
     profile_text = profile_to_text(profile)
+    company_context = (req.company_context or "").strip()
+    if not company_context and req.company_website:
+        company_context = fetch_company_info(job.company, req.company_website)
+
     ai = get_ai_service()
     content = ai.generate_cover_letter(
         profile_text=profile_text,
@@ -37,6 +42,8 @@ def generate_cover_letter(req: CoverLetterGenerate, db: Session = Depends(get_db
         jd_text=job.description,
         company=job.company,
         title=job.title,
+        company_website=req.company_website or "",
+        company_context=company_context,
     )
 
     # Determine version number

@@ -17,8 +17,12 @@ def build_cover_letter_prompt(
     jd_text: str,
     company: str,
     title: str,
+    company_website: str = "",
+    company_context: str = "",
 ) -> tuple[str, str]:
     system = COVER_LETTER_SYSTEM + f"\n\nCANDIDATE'S WRITING VOICE:\n{voice_profile}" if voice_profile else COVER_LETTER_SYSTEM
+    website_block = f"\nCOMPANY WEBSITE: {company_website}" if company_website else ""
+    context_block = f"\n\nCOMPANY WEBSITE CONTEXT:\n{company_context}" if company_context else ""
     user = f"""CANDIDATE PROFILE:
 {profile_text}
 
@@ -26,7 +30,7 @@ JOB DESCRIPTION:
 {jd_text}
 
 COMPANY: {company}
-ROLE: {title}"""
+ROLE: {title}{website_block}{context_block}"""
     return system, user
 
 

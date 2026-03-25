@@ -5,7 +5,17 @@ from app.database import get_db
 from app.models.cover_letter import CoverLetter
 from app.models.job import Job
 from app.models.profile import Profile
-from app.schemas.apply import ApplyPlanResponse, ApplyFromLinkRequest, ApplyFromLinkResponse, JobDetailsFromLink, ScrapeDebugResponse, ApplyGenerateCoverLetterRequest, ApplyRefineCoverLetterRequest
+from app.schemas.apply import (
+    ApplyPlanResponse,
+    ApplyFromLinkRequest,
+    ApplyFromLinkResponse,
+    JobDetailsFromLink,
+    ScrapeDebugResponse,
+    ApplyGenerateCoverLetterRequest,
+    ApplyRefineCoverLetterRequest,
+    CompanyContextRequest,
+    CompanyContextResponse,
+)
 from app.services.apply_planner import build_apply_plan
 from app.services.ai_service import get_ai_service
 from app.services.link_scraper import scrape_job_from_url
@@ -94,6 +104,7 @@ async def scrape_job_details(request: ApplyFromLinkRequest):
         description=job_details["description"],
         link=job_details["link"],
         company_info=job_details.get("company_info", ""),
+        company_website="",
     )
 
 
@@ -166,6 +177,12 @@ async def generate_cover_letter_from_details(request: ApplyGenerateCoverLetterRe
 
     # Generate cover letter
     try:
+        company_context = request.job.company_info or ""
+        if request.job.company_website:
+            website_info = fetch_company_info(request.job.company, request.job.company_website)
+            if website_info:
+                company_context = f"{company_context}\n\n{website_info}".strip() if company_context else website_info
+
         ai_service = get_ai_service()
         cover_letter = ai_service.generate_cover_letter(
             profile_text=profile_text,
@@ -173,6 +190,8 @@ async def generate_cover_letter_from_details(request: ApplyGenerateCoverLetterRe
             jd_text=request.job.description,
             company=request.job.company,
             title=request.job.title,
+            company_website=request.job.company_website,
+            company_context=company_context,
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to generate cover letter: {str(exc)}")
@@ -181,6 +200,23 @@ async def generate_cover_letter_from_details(request: ApplyGenerateCoverLetterRe
         job=request.job,
         cover_letter=cover_letter,
         company_info=request.job.company_info,
+    )
+
+
+@router.post("/company-context", response_model=CompanyContextResponse)
+def fetch_company_context(request: CompanyContextRequest):
+    if not request.company.strip() or not request.company_website.strip():
+        raise HTTPException(status_code=400, detail="Both company and company_website are required")
+
+    try:
+        context_summary = fetch_company_info(request.company.strip(), request.company_website.strip())
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch company website context: {str(exc)}")
+
+    return CompanyContextResponse(
+        company=request.company.strip(),
+        company_website=request.company_website.strip(),
+        context_summary=context_summary or "",
     )
 
 

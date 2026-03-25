@@ -5,6 +5,8 @@ from datetime import datetime
 
 class CoverLetterGenerate(BaseModel):
     job_id: int
+    company_website: Optional[str] = None
+    company_context: Optional[str] = None
 
 
 class CoverLetterRefine(BaseModel):

@@ -21,6 +21,13 @@ interface JobDetails {
   description: string
   link: string
   company_info?: string
+  company_website?: string
+}
+
+interface WebsiteContextFindings {
+  company: string
+  company_website: string
+  context_summary: string
 }
 
 interface CoverLetterVersion {
@@ -43,6 +50,7 @@ export default function QuickApply() {
   const [error, setError] = useState('')
   const [jobDetails, setJobDetails] = useState<JobDetails | null>(null)
   const [coverLetter, setCoverLetter] = useState('')
+  const [companyWebsite, setCompanyWebsite] = useState('')
   const [editingCoverLetter, setEditingCoverLetter] = useState(false)
   const [savingApply, setSavingApply] = useState(false)
   const [savingInterested, setSavingInterested] = useState(false)
@@ -53,6 +61,8 @@ export default function QuickApply() {
   const [isRefining, setIsRefining] = useState(false)
   const [isSavingManualEdit, setIsSavingManualEdit] = useState(false)
   const [refineFeedback, setRefineFeedback] = useState('')
+  const [websiteFindings, setWebsiteFindings] = useState<WebsiteContextFindings | null>(null)
+  const [isFetchingWebsiteFindings, setIsFetchingWebsiteFindings] = useState(false)
   const [versions, setVersions] = useState<CoverLetterVersion[]>([])
   const [selectedVersionId, setSelectedVersionId] = useState<number | null>(null)
 
@@ -110,6 +120,8 @@ export default function QuickApply() {
         setCurrentStep('confirming')
         setError('')
         setSavedInterestedId(data.id)
+        setCompanyWebsite('')
+        setWebsiteFindings(null)
 
         const letters = await loadCoverLetterVersions(data.id)
         if (letters.length > 0) {
@@ -147,9 +159,10 @@ export default function QuickApply() {
     setVersions([])
     setSelectedVersionId(null)
     setCoverLetter('')
+    setWebsiteFindings(null)
 
     try {
-      const response = await fetch('/api/apply/scrape', {
+      const response = await fetch('/api/apply/scrape/debug', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: inputLink.trim() }),
@@ -160,8 +173,26 @@ export default function QuickApply() {
         throw new Error(errorData.detail || `Failed to scrape job (${response.status})`)
       }
 
-      const data: JobDetails = await response.json()
-      setJobDetails(data)
+      const data: {
+        title: string
+        company: string
+        description: string
+        company_info?: string
+        extraction_method?: string
+        confidence?: number
+        scraper_used?: string
+        html_length?: number
+        raw_text?: string
+      } = await response.json()
+      setJobDetails({
+        title: data.title,
+        company: data.company,
+        description: data.description,
+        link: inputLink.trim(),
+        company_info: data.company_info || '',
+      })
+      setCompanyWebsite('')
+      setWebsiteFindings(null)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to scrape job details'
       setError(message)
@@ -181,7 +212,7 @@ export default function QuickApply() {
     setIsRescraping(true)
 
     try {
-      const response = await fetch('/api/apply/scrape', {
+      const response = await fetch('/api/apply/scrape/debug', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
@@ -192,9 +223,25 @@ export default function QuickApply() {
         throw new Error(errorData.detail || `Failed to re-scrape job (${response.status})`)
       }
 
-      const data: JobDetails = await response.json()
-      setJobDetails(data)
-      setInputLink(data.link || url)
+      const data: {
+        title: string
+        company: string
+        description: string
+        company_info?: string
+        extraction_method?: string
+        confidence?: number
+        scraper_used?: string
+        html_length?: number
+        raw_text?: string
+      } = await response.json()
+      setJobDetails({
+        title: data.title,
+        company: data.company,
+        description: data.description,
+        link: url,
+        company_info: data.company_info || '',
+      })
+      setInputLink(url)
       if (currentStep === 'reviewing') {
         setCurrentStep('confirming')
       }
@@ -275,7 +322,11 @@ export default function QuickApply() {
         const generatedResponse = await fetch('/api/cover-letters/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ job_id: savedInterestedId }),
+          body: JSON.stringify({
+            job_id: savedInterestedId,
+            company_website: companyWebsite.trim() || undefined,
+            company_context: websiteFindings?.context_summary || undefined,
+          }),
         })
 
         if (!generatedResponse.ok) {
@@ -295,7 +346,13 @@ export default function QuickApply() {
       const response = await fetch('/api/apply/generate-cover-letter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ job: jobDetails }),
+        body: JSON.stringify({
+          job: {
+            ...jobDetails,
+            company_website: companyWebsite.trim(),
+            company_info: [jobDetails.company_info, websiteFindings?.context_summary].filter(Boolean).join('\n\n'),
+          },
+        }),
       })
 
       if (!response.ok) {
@@ -312,7 +369,7 @@ export default function QuickApply() {
       setError(message)
       setCurrentStep('confirming')
     }
-  }, [jobDetails, savedInterestedId, loadCoverLetterVersions])
+  }, [jobDetails, savedInterestedId, companyWebsite, websiteFindings?.context_summary, loadCoverLetterVersions])
 
   const handleRefineCoverLetter = async () => {
     if (!coverLetter || !refineFeedback.trim()) return
@@ -428,9 +485,44 @@ export default function QuickApply() {
     setInputLink('')
     setError('')
     setSavedInterestedId(null)
+    setCompanyWebsite('')
+    setWebsiteFindings(null)
     setVersions([])
     setSelectedVersionId(null)
   }
+
+  const handleFetchWebsiteFindings = useCallback(async () => {
+    if (!jobDetails?.company || !companyWebsite.trim()) {
+      setError('Enter a company website to fetch additional context')
+      return
+    }
+
+    setError('')
+    setIsFetchingWebsiteFindings(true)
+    try {
+      const response = await fetch('/api/apply/company-context', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          company: jobDetails.company,
+          company_website: companyWebsite.trim(),
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || `Failed to fetch website findings (${response.status})`)
+      }
+
+      const data: WebsiteContextFindings = await response.json()
+      setWebsiteFindings(data)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch website findings'
+      setError(message)
+    } finally {
+      setIsFetchingWebsiteFindings(false)
+    }
+  }, [jobDetails?.company, companyWebsite])
 
   const handleSelectVersion = (versionId: number) => {
     const selected = versions.find((v) => v.id === versionId)
@@ -600,10 +692,13 @@ export default function QuickApply() {
       {currentStep === 'confirming' && jobDetails && (
         <div className="space-y-6 max-w-4xl mx-auto">
           <section className="bg-white border border-blue-200 rounded-xl p-6 ring-1 ring-blue-100">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <CheckCircle size={20} className="text-blue-600" />
-              Job Details Extracted
-            </h2>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <CheckCircle size={20} className="text-blue-600" />
+                Job Details Extracted
+              </h2>
+
+            </div>
 
             <div className="space-y-4">
               <div>
@@ -632,6 +727,34 @@ export default function QuickApply() {
                 </div>
               )}
 
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                  Company Website (Optional)
+                </label>
+                <input
+                  type="url"
+                  value={companyWebsite}
+                  onChange={(e) => {
+                    setCompanyWebsite(e.target.value)
+                    setWebsiteFindings(null)
+                  }}
+                  placeholder="https://company.com"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Fetch extra website context before generating a cover letter.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleFetchWebsiteFindings}
+                  disabled={!companyWebsite.trim() || isFetchingWebsiteFindings}
+                  className="mt-2 px-3 py-2 bg-slate-800 text-white text-xs font-medium rounded-lg hover:bg-slate-900 disabled:bg-slate-300 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                >
+                  {isFetchingWebsiteFindings ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  Fetch Website Context
+                </button>
+              </div>
+
               <a
                 href={jobDetails.link}
                 target="_blank"
@@ -641,6 +764,20 @@ export default function QuickApply() {
                 View full posting
                 <ExternalLink size={14} />
               </a>
+
+              {websiteFindings && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                  <p className="text-xs font-medium text-emerald-900 uppercase tracking-wide mb-2">Website Context Findings</p>
+                  <div className="text-xs text-emerald-900 mb-2">
+                    <span className="font-medium">Source:</span> {websiteFindings.company_website}
+                  </div>
+                  <div className="text-xs text-gray-900 bg-white border border-emerald-100 rounded-md p-3 max-h-44 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                    {websiteFindings.context_summary || 'No additional context found from the website yet.'}
+                  </div>
+                </div>
+              )}
+
+
             </div>
           </section>
 
@@ -718,6 +855,9 @@ export default function QuickApply() {
           {/* Job Details Summary */}
           <section className="bg-gray-50 border border-gray-200 rounded-xl p-5">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">Position: {jobDetails.title} @ {jobDetails.company}</h3>
+            {companyWebsite.trim() && (
+              <p className="text-xs text-gray-600 mb-2">Company website context: {companyWebsite.trim()}</p>
+            )}
             <a
               href={jobDetails.link}
               target="_blank"

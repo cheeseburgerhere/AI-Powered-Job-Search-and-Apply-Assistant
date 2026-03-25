@@ -19,6 +19,7 @@ class JobDetailsFromLink(BaseModel):
     description: str
     link: str
     company_info: str = ""
+    company_website: str = ""
 
 
 class ApplyFromLinkRequest(BaseModel):
@@ -38,6 +39,17 @@ class ApplyGenerateCoverLetterRequest(BaseModel):
 class ApplyRefineCoverLetterRequest(BaseModel):
     cover_letter: str
     feedback: str
+
+
+class CompanyContextRequest(BaseModel):
+    company: str
+    company_website: str
+
+
+class CompanyContextResponse(BaseModel):
+    company: str
+    company_website: str
+    context_summary: str = ""
 
 
 class ScrapeDebugResponse(BaseModel):
