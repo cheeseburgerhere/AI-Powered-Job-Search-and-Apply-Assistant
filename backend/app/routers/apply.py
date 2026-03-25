@@ -5,7 +5,7 @@ from app.database import get_db
 from app.models.cover_letter import CoverLetter
 from app.models.job import Job
 from app.models.profile import Profile
-from app.schemas.apply import ApplyPlanResponse, ApplyFromLinkRequest, ApplyFromLinkResponse, JobDetailsFromLink, ScrapeDebugResponse
+from app.schemas.apply import ApplyPlanResponse, ApplyFromLinkRequest, ApplyFromLinkResponse, JobDetailsFromLink, ScrapeDebugResponse, ApplyGenerateCoverLetterRequest, ApplyRefineCoverLetterRequest
 from app.services.apply_planner import build_apply_plan
 from app.services.ai_service import get_ai_service
 from app.services.link_scraper import scrape_job_from_url
@@ -150,3 +150,51 @@ async def generate_cover_letter_from_link(request: ApplyFromLinkRequest, db: Ses
         cover_letter=cover_letter,
         company_info=job_details.get("company_info", ""),
     )
+
+
+@router.post("/generate-cover-letter", response_model=ApplyFromLinkResponse)
+async def generate_cover_letter_from_details(request: ApplyGenerateCoverLetterRequest, db: Session = Depends(get_db)):
+    """
+    Generate a cover letter directly from existing job details without rescraping.
+    """
+    profile = db.query(Profile).first()
+    if not profile:
+        raise HTTPException(status_code=400, detail="Profile not set up. Complete onboarding first.")
+
+    # Convert profile to text
+    profile_text = profile_to_text(profile)
+
+    # Generate cover letter
+    try:
+        ai_service = get_ai_service()
+        cover_letter = ai_service.generate_cover_letter(
+            profile_text=profile_text,
+            voice_profile=profile.voice_profile or "",
+            jd_text=request.job.description,
+            company=request.job.company,
+            title=request.job.title,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to generate cover letter: {str(exc)}")
+
+    return ApplyFromLinkResponse(
+        job=request.job,
+        cover_letter=cover_letter,
+        company_info=request.job.company_info,
+    )
+
+
+@router.post("/refine-cover-letter")
+def refine_cover_letter_text(request: ApplyRefineCoverLetterRequest):
+    """
+    Refine a cover letter text based on user feedback (without needing a saved DB record).
+    """
+    if not request.cover_letter or not request.feedback:
+        raise HTTPException(status_code=400, detail="Both cover_letter and feedback are required")
+
+    try:
+        ai_service = get_ai_service()
+        refined_content = ai_service.refine_cover_letter(request.cover_letter, request.feedback)
+        return {"cover_letter": refined_content}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to refine cover letter: {str(exc)}")

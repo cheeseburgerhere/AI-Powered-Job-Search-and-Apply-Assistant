@@ -9,6 +9,7 @@ import {
   Send,
   AlertCircle,
   CheckCircle,
+  RefreshCw,
 } from 'lucide-react'
 import { useProfileStore } from '../stores/profileStore'
 
@@ -34,6 +35,8 @@ export default function QuickApply() {
   const [savingApply, setSavingApply] = useState(false)
   const [copyFeedback, setCopyFeedback] = useState('')
   const [isScraping, setIsScraping] = useState(false)
+  const [isRefining, setIsRefining] = useState(false)
+  const [refineFeedback, setRefineFeedback] = useState('')
 
   // Step 1: Extract job details from URL
   const handleScrapeJob = useCallback(async () => {
@@ -76,10 +79,10 @@ export default function QuickApply() {
     setError('')
 
     try {
-      const response = await fetch('/api/apply/from-link', {
+      const response = await fetch('/api/apply/generate-cover-letter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: jobDetails.link }),
+        body: JSON.stringify({ job: jobDetails }),
       })
 
       if (!response.ok) {
@@ -96,6 +99,35 @@ export default function QuickApply() {
       setCurrentStep('confirming')
     }
   }, [jobDetails, profile])
+
+  const handleRefineCoverLetter = async () => {
+    if (!coverLetter || !refineFeedback.trim()) return
+
+    setIsRefining(true)
+    setError('')
+
+    try {
+      const response = await fetch('/api/apply/refine-cover-letter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cover_letter: coverLetter, feedback: refineFeedback }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || `Failed to refine cover letter (${response.status})`)
+      }
+
+      const data = await response.json()
+      setCoverLetter(data.cover_letter)
+      setRefineFeedback('')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to refine cover letter'
+      setError(message)
+    } finally {
+      setIsRefining(false)
+    }
+  }
 
   // Step 3: Save application
   const handleApplied = async () => {
@@ -400,33 +432,55 @@ export default function QuickApply() {
             </div>
           )}
 
-          {/* Actions */}
+          {/* Actions - moved to the bottom of the left column if we split it, but keep it here for now */}
           {!editingCoverLetter && (
-            <div className="flex gap-3">
-              <button
-                onClick={handleReset}
-                className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-              >
-                Start Over
-              </button>
-              <button
-                onClick={handleApplied}
-                disabled={savingApply}
-                className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
-              >
-                {savingApply ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 size={18} />
-                    Mark as Applied
-                  </>
-                )}
-              </button>
-            </div>
+            <>
+              {/* Refinement panel */}
+              <div className="bg-white border border-gray-200 rounded-xl p-6">
+                <h3 className="font-semibold text-sm mb-3">Refine Cover Letter</h3>
+                <textarea
+                  value={refineFeedback}
+                  onChange={(e) => setRefineFeedback(e.target.value)}
+                  rows={3}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., Make it shorter, emphasize Python more, more formal tone..."
+                />
+                <button
+                  onClick={handleRefineCoverLetter}
+                  disabled={isRefining || !refineFeedback.trim()}
+                  className="mt-3 w-full px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+                >
+                  {isRefining ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                  Refine with AI
+                </button>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleReset}
+                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                >
+                  Start Over
+                </button>
+                <button
+                  onClick={handleApplied}
+                  disabled={savingApply}
+                  className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
+                >
+                  {savingApply ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={18} />
+                      Mark as Applied
+                    </>
+                  )}
+                </button>
+              </div>
+            </>
           )}
         </div>
       )}
