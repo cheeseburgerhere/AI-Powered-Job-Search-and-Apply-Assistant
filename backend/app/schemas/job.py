@@ -20,6 +20,7 @@ class JobUpdate(BaseModel):
     status: Optional[str] = None
     notes: Optional[str] = None
     next_follow_up: Optional[datetime] = None
+    cover_letter: Optional[str] = None
 
 
 class JobResponse(BaseModel):

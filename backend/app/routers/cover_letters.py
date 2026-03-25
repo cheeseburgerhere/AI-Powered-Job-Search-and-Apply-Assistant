@@ -9,6 +9,7 @@ from app.schemas.cover_letter import (
     CoverLetterGenerate,
     CoverLetterRefine,
     CoverLetterContentUpdate,
+    CoverLetterManualVersionCreate,
     CoverLetterStatusUpdate,
     CoverLetterResponse,
 )
@@ -105,6 +106,36 @@ def update_cover_letter_content(letter_id: int, req: CoverLetterContentUpdate, d
     db.commit()
     db.refresh(letter)
     return letter
+
+
+@router.post("/{letter_id}/manual-version", response_model=CoverLetterResponse)
+def create_manual_cover_letter_version(letter_id: int, req: CoverLetterManualVersionCreate, db: Session = Depends(get_db)):
+    letter = db.query(CoverLetter).filter(CoverLetter.id == letter_id).first()
+    if not letter:
+        raise HTTPException(status_code=404, detail="Cover letter not found")
+
+    if not req.content.strip():
+        raise HTTPException(status_code=400, detail="Content cannot be empty")
+
+    latest = (
+        db.query(CoverLetter)
+        .filter(CoverLetter.job_id == letter.job_id)
+        .order_by(CoverLetter.version.desc())
+        .first()
+    )
+    next_version = (latest.version + 1) if latest else (letter.version + 1)
+
+    new_letter = CoverLetter(
+        job_id=letter.job_id,
+        version=next_version,
+        content=req.content,
+        feedback=(req.feedback or "Manual edit"),
+        status="draft",
+    )
+    db.add(new_letter)
+    db.commit()
+    db.refresh(new_letter)
+    return new_letter
 
 
 @router.put("/{letter_id}/status", response_model=CoverLetterResponse)

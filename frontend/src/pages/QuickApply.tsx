@@ -1,15 +1,17 @@
-import { useCallback, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
   CheckCircle2,
   Copy,
   ExternalLink,
   Loader2,
+  Save,
   Send,
   AlertCircle,
   CheckCircle,
   RefreshCw,
+  X,
 } from 'lucide-react'
 import { useProfileStore } from '../stores/profileStore'
 
@@ -21,11 +23,21 @@ interface JobDetails {
   company_info?: string
 }
 
+interface CoverLetterVersion {
+  id: number
+  job_id: number
+  version: number
+  content: string
+  feedback: string | null
+  status: string
+}
+
 type Step = 'input' | 'confirming' | 'generating' | 'reviewing' | 'applied'
 
 export default function QuickApply() {
   const navigate = useNavigate()
-  const { profile } = useProfileStore()
+  const [searchParams] = useSearchParams()
+  const { profile, fetchProfile } = useProfileStore()
   const [inputLink, setInputLink] = useState('')
   const [currentStep, setCurrentStep] = useState<Step>('input')
   const [error, setError] = useState('')
@@ -33,10 +45,92 @@ export default function QuickApply() {
   const [coverLetter, setCoverLetter] = useState('')
   const [editingCoverLetter, setEditingCoverLetter] = useState(false)
   const [savingApply, setSavingApply] = useState(false)
+  const [savingInterested, setSavingInterested] = useState(false)
+  const [savedInterestedId, setSavedInterestedId] = useState<number | null>(null)
   const [copyFeedback, setCopyFeedback] = useState('')
   const [isScraping, setIsScraping] = useState(false)
   const [isRefining, setIsRefining] = useState(false)
+  const [isSavingManualEdit, setIsSavingManualEdit] = useState(false)
   const [refineFeedback, setRefineFeedback] = useState('')
+  const [versions, setVersions] = useState<CoverLetterVersion[]>([])
+  const [selectedVersionId, setSelectedVersionId] = useState<number | null>(null)
+
+  const loadCoverLetterVersions = useCallback(async (jobId: number) => {
+    const response = await fetch(`/api/cover-letters?job_id=${jobId}`)
+    if (!response.ok) {
+      throw new Error('Failed to load cover letter versions')
+    }
+    const letters: CoverLetterVersion[] = await response.json()
+    setVersions(letters)
+    return letters
+  }, [])
+
+  useEffect(() => {
+    if (!profile) {
+      void fetchProfile()
+    }
+  }, [profile, fetchProfile])
+
+  useEffect(() => {
+    const jobIdParam = searchParams.get('jobId')
+    if (!jobIdParam) return
+
+    const jobId = Number(jobIdParam)
+    if (!Number.isInteger(jobId) || jobId <= 0) return
+
+    let isCancelled = false
+
+    const loadJob = async () => {
+      try {
+        const response = await fetch(`/api/jobs/${jobId}`)
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.detail || `Failed to load job (${response.status})`)
+        }
+
+        const data: {
+          id: number
+          title: string
+          company: string
+          description: string
+          url: string | null
+          status: string
+        } = await response.json()
+
+        if (isCancelled) return
+
+        setJobDetails({
+          title: data.title,
+          company: data.company,
+          description: data.description,
+          link: data.url || '',
+        })
+        setInputLink(data.url || '')
+        setCurrentStep('confirming')
+        setError('')
+        setSavedInterestedId(data.id)
+
+        const letters = await loadCoverLetterVersions(data.id)
+        if (letters.length > 0) {
+          setSelectedVersionId(letters[0].id)
+          setCoverLetter(letters[0].content)
+        } else {
+          setSelectedVersionId(null)
+          setCoverLetter('')
+        }
+      } catch (err) {
+        if (isCancelled) return
+        const message = err instanceof Error ? err.message : 'Failed to load selected job'
+        setError(message)
+      }
+    }
+
+    void loadJob()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [searchParams, loadCoverLetterVersions])
 
   // Step 1: Extract job details from URL
   const handleScrapeJob = useCallback(async () => {
@@ -48,6 +142,10 @@ export default function QuickApply() {
     setCurrentStep('confirming')
     setError('')
     setIsScraping(true)
+    setSavedInterestedId(null)
+    setVersions([])
+    setSelectedVersionId(null)
+    setCoverLetter('')
 
     try {
       const response = await fetch('/api/apply/scrape', {
@@ -71,14 +169,92 @@ export default function QuickApply() {
     }
   }, [inputLink])
 
+  const handleSaveInterested = useCallback(async () => {
+    if (!jobDetails || savingInterested || savedInterestedId) return
+
+    setSavingInterested(true)
+    setError('')
+
+    try {
+      const response = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: jobDetails.title,
+          company: jobDetails.company,
+          description: jobDetails.description,
+          url: jobDetails.link,
+          source: 'manual',
+          status: 'interested',
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || `Failed to save job (${response.status})`)
+      }
+
+      const data: { id: number } = await response.json()
+      setSavedInterestedId(data.id)
+      const letters = await loadCoverLetterVersions(data.id)
+      if (letters.length > 0) {
+        setSelectedVersionId(letters[0].id)
+        setCoverLetter(letters[0].content)
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save to interested'
+      setError(message)
+    } finally {
+      setSavingInterested(false)
+    }
+  }, [jobDetails, savingInterested, savedInterestedId, loadCoverLetterVersions])
+
   // Step 2: User confirms details, generate cover letter
   const handleGenerateCoverLetter = useCallback(async () => {
-    if (!jobDetails || !profile) return
+    if (!jobDetails) return
+
+    if (!useProfileStore.getState().profile) {
+      await useProfileStore.getState().fetchProfile()
+    }
+
+    if (!useProfileStore.getState().profile) {
+      setError('Profile not set up. Please complete onboarding before generating a cover letter.')
+      return
+    }
 
     setCurrentStep('generating')
     setError('')
 
     try {
+      if (savedInterestedId) {
+        const existing = await loadCoverLetterVersions(savedInterestedId)
+        if (existing.length > 0) {
+          setSelectedVersionId(existing[0].id)
+          setCoverLetter(existing[0].content)
+          setCurrentStep('reviewing')
+          return
+        }
+
+        const generatedResponse = await fetch('/api/cover-letters/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ job_id: savedInterestedId }),
+        })
+
+        if (!generatedResponse.ok) {
+          const errorData = await generatedResponse.json().catch(() => ({}))
+          throw new Error(errorData.detail || `Failed to generate cover letter (${generatedResponse.status})`)
+        }
+
+        const generated: CoverLetterVersion = await generatedResponse.json()
+        const refreshed = await loadCoverLetterVersions(savedInterestedId)
+        setSelectedVersionId(generated.id)
+        setCoverLetter(generated.content)
+        setVersions(refreshed)
+        setCurrentStep('reviewing')
+        return
+      }
+
       const response = await fetch('/api/apply/generate-cover-letter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -92,13 +268,14 @@ export default function QuickApply() {
 
       const data = await response.json()
       setCoverLetter(data.cover_letter)
+      setSelectedVersionId(null)
       setCurrentStep('reviewing')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to generate cover letter'
       setError(message)
       setCurrentStep('confirming')
     }
-  }, [jobDetails, profile])
+  }, [jobDetails, savedInterestedId, loadCoverLetterVersions])
 
   const handleRefineCoverLetter = async () => {
     if (!coverLetter || !refineFeedback.trim()) return
@@ -107,6 +284,27 @@ export default function QuickApply() {
     setError('')
 
     try {
+      if (selectedVersionId && savedInterestedId) {
+        const response = await fetch(`/api/cover-letters/${selectedVersionId}/refine`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ feedback: refineFeedback }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.detail || `Failed to refine cover letter (${response.status})`)
+        }
+
+        const newVersion: CoverLetterVersion = await response.json()
+        const refreshed = await loadCoverLetterVersions(savedInterestedId)
+        setVersions(refreshed)
+        setSelectedVersionId(newVersion.id)
+        setCoverLetter(newVersion.content)
+        setRefineFeedback('')
+        return
+      }
+
       const response = await fetch('/api/apply/refine-cover-letter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -135,18 +333,27 @@ export default function QuickApply() {
 
     setSavingApply(true)
     try {
-      const response = await fetch('/api/jobs', {
-        method: 'POST',
+      const endpoint = savedInterestedId ? `/api/jobs/${savedInterestedId}` : '/api/jobs'
+      const method = savedInterestedId ? 'PUT' : 'POST'
+      const payload = savedInterestedId
+        ? {
+            status: 'applied',
+            ...(selectedVersionId ? {} : { cover_letter: coverLetter }),
+          }
+        : {
+            title: jobDetails.title,
+            company: jobDetails.company,
+            description: jobDetails.description,
+            url: jobDetails.link,
+            source: 'manual',
+            status: 'applied',
+            cover_letter: coverLetter,
+          }
+
+      const response = await fetch(endpoint, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: jobDetails.title,
-          company: jobDetails.company,
-          description: jobDetails.description,
-          url: jobDetails.link,
-          source: 'manual',
-          status: 'applied',
-          cover_letter: coverLetter,
-        }),
+        body: JSON.stringify(payload),
       })
 
       if (!response.ok) {
@@ -160,6 +367,8 @@ export default function QuickApply() {
         setJobDetails(null)
         setCoverLetter('')
         setInputLink('')
+        setVersions([])
+        setSelectedVersionId(null)
       }, 2000)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save application'
@@ -181,6 +390,66 @@ export default function QuickApply() {
     setCoverLetter('')
     setInputLink('')
     setError('')
+    setSavedInterestedId(null)
+    setVersions([])
+    setSelectedVersionId(null)
+  }
+
+  const handleSelectVersion = (versionId: number) => {
+    const selected = versions.find((v) => v.id === versionId)
+    if (!selected) return
+    setSelectedVersionId(selected.id)
+    setCoverLetter(selected.content)
+    setEditingCoverLetter(false)
+  }
+
+  const handleSaveManualEdit = async () => {
+    if (!coverLetter.trim()) return
+
+    if (!savedInterestedId || !selectedVersionId) {
+      setEditingCoverLetter(false)
+      return
+    }
+
+    setIsSavingManualEdit(true)
+    setError('')
+    try {
+      const response = await fetch(`/api/cover-letters/${selectedVersionId}/manual-version`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: coverLetter,
+          feedback: 'Manual edit',
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || `Failed to save manual version (${response.status})`)
+      }
+
+      const newVersion: CoverLetterVersion = await response.json()
+      const refreshed = await loadCoverLetterVersions(savedInterestedId)
+      setVersions(refreshed)
+      setSelectedVersionId(newVersion.id)
+      setCoverLetter(newVersion.content)
+      setEditingCoverLetter(false)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save manual edit'
+      setError(message)
+    } finally {
+      setIsSavingManualEdit(false)
+    }
+  }
+
+  const handleCancelManualEdit = () => {
+    if (selectedVersionId) {
+      const active = versions.find((v) => v.id === selectedVersionId)
+      if (active) {
+        setCoverLetter(active.content)
+      }
+    }
+    setEditingCoverLetter(false)
   }
 
   return (
@@ -343,6 +612,28 @@ export default function QuickApply() {
               Cancel
             </button>
             <button
+              onClick={handleSaveInterested}
+              disabled={savingInterested || !!savedInterestedId}
+              className="flex-1 px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:bg-amber-200 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
+            >
+              {savingInterested ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Saving to Interested...
+                </>
+              ) : savedInterestedId ? (
+                <>
+                  <CheckCircle2 size={18} />
+                  Saved to Interested
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 size={18} />
+                  Save to Interested
+                </>
+              )}
+            </button>
+            <button
               onClick={handleGenerateCoverLetter}
               className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2"
             >
@@ -350,6 +641,18 @@ export default function QuickApply() {
               Proceed to Cover Letter
             </button>
           </div>
+
+          {savedInterestedId && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800 flex items-center justify-between gap-3">
+              <span>Saved to tracker Interested board.</span>
+              <button
+                onClick={() => navigate('/tracker')}
+                className="font-medium text-green-900 hover:text-green-700"
+              >
+                Open Tracker
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -381,7 +684,14 @@ export default function QuickApply() {
           {/* Cover Letter */}
           <section className="bg-white border border-gray-200 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Your Cover Letter</h3>
+              <div className="flex items-center gap-3">
+                <h3 className="text-lg font-semibold text-gray-900">Your Cover Letter</h3>
+                {selectedVersionId && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                    v{versions.find((v) => v.id === selectedVersionId)?.version}
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 {copyFeedback && (
                   <span className="text-xs text-green-600 font-medium">{copyFeedback}</span>
@@ -403,12 +713,23 @@ export default function QuickApply() {
                   onChange={(e) => setCoverLetter(e.target.value)}
                   className="w-full h-96 px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
                 />
-                <button
-                  onClick={() => setEditingCoverLetter(false)}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
-                >
-                  Done Editing
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleSaveManualEdit}
+                    disabled={isSavingManualEdit || !coverLetter.trim()}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-2"
+                  >
+                    {isSavingManualEdit ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                    Save as New Version
+                  </button>
+                  <button
+                    onClick={handleCancelManualEdit}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium flex items-center gap-2"
+                  >
+                    <X size={16} />
+                    Cancel
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
@@ -425,6 +746,32 @@ export default function QuickApply() {
             )}
           </section>
 
+          {versions.length > 1 && (
+            <section className="bg-white border border-gray-200 rounded-xl p-6">
+              <h3 className="font-semibold text-sm mb-3">Version History</h3>
+              <div className="space-y-2">
+                {versions.map((version) => (
+                  <button
+                    key={version.id}
+                    type="button"
+                    onClick={() => handleSelectVersion(version.id)}
+                    className={`w-full text-left text-xs p-2 rounded-lg border transition-colors ${
+                      version.id === selectedVersionId
+                        ? 'border-blue-200 bg-blue-50'
+                        : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className="font-medium">v{version.version}</span>
+                    <span className="text-gray-500 ml-2">{version.status}</span>
+                    {version.feedback && (
+                      <p className="text-gray-400 mt-1 truncate">"{version.feedback}"</p>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex gap-3">
               <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
@@ -438,6 +785,11 @@ export default function QuickApply() {
               {/* Refinement panel */}
               <div className="bg-white border border-gray-200 rounded-xl p-6">
                 <h3 className="font-semibold text-sm mb-3">Refine Cover Letter</h3>
+                {savedInterestedId && versions.length > 0 && (
+                  <p className="text-xs text-gray-500 mb-3">
+                    Existing versions found. Selecting and refining versions here saves extra AI generation calls.
+                  </p>
+                )}
                 <textarea
                   value={refineFeedback}
                   onChange={(e) => setRefineFeedback(e.target.value)}

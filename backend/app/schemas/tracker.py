@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
+from app.schemas.job import JobResponse
 
 
 class TrackerEventResponse(BaseModel):
@@ -31,3 +32,10 @@ class TrackerStatsResponse(BaseModel):
     interview: int = 0
     offer: int = 0
     rejected: int = 0
+
+
+class TrackerRejectedBinResponse(BaseModel):
+    key: str
+    label: str
+    count: int = 0
+    jobs: list[JobResponse] = []

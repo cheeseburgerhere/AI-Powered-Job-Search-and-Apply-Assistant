@@ -285,6 +285,8 @@ def update_job(job_id: int, update: JobUpdate, db: Session = Depends(get_db)):
     old_status = job.status
     update_data = update.model_dump(exclude_unset=True)
 
+    cover_letter_text = update_data.pop("cover_letter", None)
+
     for key, value in update_data.items():
         setattr(job, key, value)
 
@@ -299,6 +301,24 @@ def update_job(job_id: int, update: JobUpdate, db: Session = Depends(get_db)):
             job.date_applied = datetime.now(timezone.utc)
             if not job.next_follow_up:
                 job.next_follow_up = datetime.now(timezone.utc) + timedelta(days=14)
+
+    if cover_letter_text:
+        from app.models.cover_letter import CoverLetter
+
+        latest_letter = (
+            db.query(CoverLetter)
+            .filter(CoverLetter.job_id == job.id)
+            .order_by(CoverLetter.version.desc())
+            .first()
+        )
+        next_version = (latest_letter.version + 1) if latest_letter else 1
+        letter = CoverLetter(
+            job_id=job.id,
+            version=next_version,
+            content=cover_letter_text,
+            status="draft",
+        )
+        db.add(letter)
 
     db.commit()
     db.refresh(job)

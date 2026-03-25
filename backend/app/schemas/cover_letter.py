@@ -19,6 +19,11 @@ class CoverLetterContentUpdate(BaseModel):
     content: str
 
 
+class CoverLetterManualVersionCreate(BaseModel):
+    content: str
+    feedback: Optional[str] = "Manual edit"
+
+
 class CoverLetterResponse(BaseModel):
     id: int
     job_id: int

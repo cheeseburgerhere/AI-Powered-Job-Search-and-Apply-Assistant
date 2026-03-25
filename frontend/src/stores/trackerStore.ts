@@ -21,6 +21,13 @@ interface TrackerStats {
   rejected: number
 }
 
+interface RejectedBin {
+  key: string
+  label: string
+  count: number
+  jobs: Job[]
+}
+
 interface TrackerEvent {
   id: number
   job_id: number
@@ -34,11 +41,13 @@ interface TrackerState {
   board: TrackerBoard
   stats: TrackerStats
   events: TrackerEvent[]
+  rejectedBins: RejectedBin[]
   loading: boolean
 
   fetchBoard: () => Promise<void>
   fetchStats: () => Promise<void>
   fetchEvents: (jobId: number) => Promise<void>
+  fetchRejectedBins: () => Promise<void>
 }
 
 const emptyBoard: TrackerBoard = {
@@ -64,6 +73,7 @@ export const useTrackerStore = create<TrackerState>((set) => ({
   board: emptyBoard,
   stats: emptyStats,
   events: [],
+  rejectedBins: [],
   loading: false,
 
   fetchBoard: async () => {
@@ -89,6 +99,15 @@ export const useTrackerStore = create<TrackerState>((set) => ({
     try {
       const { data } = await api.get('/tracker/events', { params: { job_id: jobId } })
       set({ events: data })
+    } catch {
+      // silent
+    }
+  },
+
+  fetchRejectedBins: async () => {
+    try {
+      const { data } = await api.get('/tracker/rejected-bins')
+      set({ rejectedBins: data })
     } catch {
       // silent
     }
