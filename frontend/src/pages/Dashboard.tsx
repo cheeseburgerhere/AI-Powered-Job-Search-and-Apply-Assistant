@@ -3,7 +3,10 @@ import { useProfileStore } from '../stores/profileStore'
 import { useTrackerStore } from '../stores/trackerStore'
 import { useJobStore } from '../stores/jobStore'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, Briefcase, FileText, TrendingUp } from 'lucide-react'
+import { AlertTriangle, Briefcase, FileText, TrendingUp, Search, Clock3, Ban } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+
+type StatColor = 'slate' | 'blue' | 'amber' | 'green' | 'violet' | 'emerald' | 'rose'
 
 export default function Dashboard() {
   const { profile, fetchProfile } = useProfileStore()
@@ -43,11 +46,18 @@ export default function Dashboard() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Total Jobs" value={stats.total} icon={Briefcase} color="blue" />
-        <StatCard label="Applied" value={stats.applied} icon={FileText} color="green" />
-        <StatCard label="Interviews" value={stats.interview} icon={TrendingUp} color="purple" />
-        <StatCard label="Offers" value={stats.offer} icon={TrendingUp} color="emerald" />
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">Pipeline Summary</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
+          <StatCard label="Total" value={stats.total} icon={Briefcase} color="slate" />
+          <StatCard label="Discovered" value={stats.discovered} icon={Search} color="blue" />
+          <StatCard label="Interested" value={stats.interested} icon={TrendingUp} color="amber" />
+          <StatCard label="Applied" value={stats.applied} icon={FileText} color="green" />
+          <StatCard label="Follow Up" value={stats.follow_up} icon={Clock3} color="blue" />
+          <StatCard label="Interview" value={stats.interview} icon={TrendingUp} color="violet" />
+          <StatCard label="Offer" value={stats.offer} icon={TrendingUp} color="emerald" />
+          <StatCard label="Rejected" value={stats.rejected} icon={Ban} color="rose" />
+        </div>
       </div>
 
       {/* Nudges */}
@@ -104,12 +114,15 @@ export default function Dashboard() {
   )
 }
 
-function StatCard({ label, value, icon: Icon, color }: { label: string; value: number; icon: any; color: string }) {
-  const colors: Record<string, string> = {
+function StatCard({ label, value, icon: Icon, color }: { label: string; value: number; icon: LucideIcon; color: StatColor }) {
+  const colors: Record<StatColor, string> = {
+    slate: 'bg-slate-100 text-slate-700',
     blue: 'bg-blue-50 text-blue-600',
+    amber: 'bg-amber-50 text-amber-700',
     green: 'bg-green-50 text-green-600',
-    purple: 'bg-purple-50 text-purple-600',
+    violet: 'bg-violet-50 text-violet-700',
     emerald: 'bg-emerald-50 text-emerald-600',
+    rose: 'bg-rose-50 text-rose-700',
   }
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4">

@@ -27,16 +27,6 @@ const SCRAPE_AGENTS: ScrapeAgent[] = [
     available: true,
   },
   {
-    id: 'greenhouse',
-    name: 'Greenhouse',
-    domain: 'boards.greenhouse.io',
-    description: 'Search open positions from Greenhouse job boards via API',
-    color: 'text-green-700',
-    bgColor: 'bg-green-50',
-    borderColor: 'border-green-500',
-    available: true,
-  },
-  {
     id: 'ashby',
     name: 'Ashby',
     domain: 'jobs.ashbyhq.com',
@@ -45,6 +35,16 @@ const SCRAPE_AGENTS: ScrapeAgent[] = [
     bgColor: 'bg-purple-50',
     borderColor: 'border-purple-500',
     available: true,
+  },
+  {
+    id: 'greenhouse',
+    name: 'Greenhouse',
+    domain: 'boards.greenhouse.io',
+    description: 'Search open positions from Greenhouse job boards via API',
+    color: 'text-green-700',
+    bgColor: 'bg-green-50',
+    borderColor: 'border-green-500',
+    available: false,
   },
   // {
   //   id: 'linkedin',

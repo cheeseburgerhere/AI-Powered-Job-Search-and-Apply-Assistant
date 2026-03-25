@@ -26,6 +26,7 @@ class TrackerBoardResponse(BaseModel):
 
 class TrackerStatsResponse(BaseModel):
     total: int = 0
+    discovered: int = 0
     interested: int = 0
     applied: int = 0
     follow_up: int = 0

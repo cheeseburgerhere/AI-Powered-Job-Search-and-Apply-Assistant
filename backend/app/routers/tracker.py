@@ -43,7 +43,10 @@ def get_events(job_id: int, db: Session = Depends(get_db)):
 
 @router.get("/stats", response_model=TrackerStatsResponse)
 def get_stats(db: Session = Depends(get_db)):
-    stats = {"total": db.query(Job).count()}
+    stats = {
+        "total": db.query(Job).count(),
+        "discovered": db.query(Job).filter(Job.status == "discovered").count(),
+    }
     for status in STATUSES:
         stats[status] = db.query(Job).filter(Job.status == status).count()
     return stats

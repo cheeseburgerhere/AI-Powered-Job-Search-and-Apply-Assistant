@@ -13,6 +13,7 @@ interface TrackerBoard {
 
 interface TrackerStats {
   total: number
+  discovered: number
   interested: number
   applied: number
   follow_up: number
@@ -61,6 +62,7 @@ const emptyBoard: TrackerBoard = {
 
 const emptyStats: TrackerStats = {
   total: 0,
+  discovered: 0,
   interested: 0,
   applied: 0,
   follow_up: 0,

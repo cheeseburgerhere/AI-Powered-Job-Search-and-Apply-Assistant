@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useJobStore, type Job } from '../stores/jobStore'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Star, ExternalLink, Loader2, Trash2 } from 'lucide-react'
+import { ArrowLeft, Plus, Star, ExternalLink, Loader2, Send, Trash2 } from 'lucide-react'
 
 function sanitizeText(value: string | null | undefined) {
   return (value || '')
@@ -265,6 +265,15 @@ function JobCard({
             >
               <ExternalLink size={16} />
             </a>
+          )}
+          {job.status === 'discovered' && (
+            <Link
+              to={`/apply?jobId=${job.id}`}
+              className="px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 inline-flex items-center gap-1"
+            >
+              <Send size={12} />
+              Apply
+            </Link>
           )}
           <Link
             to={`/cover-letters?job_id=${job.id}`}

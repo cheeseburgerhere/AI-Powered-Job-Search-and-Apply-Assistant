@@ -49,6 +49,7 @@ export default function QuickApply() {
   const [savedInterestedId, setSavedInterestedId] = useState<number | null>(null)
   const [copyFeedback, setCopyFeedback] = useState('')
   const [isScraping, setIsScraping] = useState(false)
+  const [isRescraping, setIsRescraping] = useState(false)
   const [isRefining, setIsRefining] = useState(false)
   const [isSavingManualEdit, setIsSavingManualEdit] = useState(false)
   const [refineFeedback, setRefineFeedback] = useState('')
@@ -168,6 +169,42 @@ export default function QuickApply() {
       setIsScraping(false)
     }
   }, [inputLink])
+
+  const handleRescrapeJob = useCallback(async () => {
+    const url = (jobDetails?.link || inputLink).trim()
+    if (!url) {
+      setError('No job link available to scrape again')
+      return
+    }
+
+    setError('')
+    setIsRescraping(true)
+
+    try {
+      const response = await fetch('/api/apply/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || `Failed to re-scrape job (${response.status})`)
+      }
+
+      const data: JobDetails = await response.json()
+      setJobDetails(data)
+      setInputLink(data.link || url)
+      if (currentStep === 'reviewing') {
+        setCurrentStep('confirming')
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to scrape job details again'
+      setError(message)
+    } finally {
+      setIsRescraping(false)
+    }
+  }, [jobDetails?.link, inputLink, currentStep])
 
   const handleSaveInterested = useCallback(async () => {
     if (!jobDetails || savingInterested || savedInterestedId) return
@@ -465,6 +502,16 @@ export default function QuickApply() {
           <h1 className="text-2xl font-bold text-gray-900">Quick Apply</h1>
           <p className="text-gray-500 mt-1">Paste a job link → verify details → generate cover letter</p>
         </div>
+        {(jobDetails?.link || inputLink.trim()) && (
+          <button
+            onClick={handleRescrapeJob}
+            disabled={isRescraping || isScraping}
+            className="ml-auto px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors text-sm font-medium inline-flex items-center gap-2"
+          >
+            {isRescraping ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+            Scrape Again
+          </button>
+        )}
       </div>
 
       {/* Progress Indicator */}
