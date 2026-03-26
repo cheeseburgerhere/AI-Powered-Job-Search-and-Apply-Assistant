@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ai-job-assistant-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app
+      - backend_data:/app/data
+      - ./.env:/app/.env:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEBUG=True
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - ai-job-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ai-job-assistant-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./.env:/app/.env:ro
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+      - CHOKIDAR_USEPOLLING=true
+    command: npm run dev
+    networks:
+      - ai-job-network
+    depends_on:
+      - backend
+
+networks:
+  ai-job-network:
+    driver: bridge
+
+volumes:
+  backend_data:
