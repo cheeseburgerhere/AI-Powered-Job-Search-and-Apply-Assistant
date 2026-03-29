@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -16,6 +17,7 @@ from app.schemas.cover_letter import (
 from app.services.resume_parser import profile_to_text
 from app.services.ai_service import get_ai_service
 from app.services.company_info import fetch_company_info
+from app.services.pdf_generator import generate_cover_letter_pdf
 
 router = APIRouter(prefix="/api/cover-letters", tags=["cover-letters"])
 
@@ -75,6 +77,23 @@ def get_cover_letter(letter_id: int, db: Session = Depends(get_db)):
     if not letter:
         raise HTTPException(status_code=404, detail="Cover letter not found")
     return letter
+
+
+@router.get("/{letter_id}/download")
+def download_cover_letter(letter_id: int, db: Session = Depends(get_db)):
+    letter = db.query(CoverLetter).filter(CoverLetter.id == letter_id).first()
+    if not letter:
+        raise HTTPException(status_code=404, detail="Cover letter not found")
+
+    job = db.query(Job).filter(Job.id == letter.job_id).first()
+    job_title = job.title.replace(" ", "_").replace("/", "_") if job else "cover_letter"
+    filename = f"{job_title}_v{letter.version}.pdf"
+
+    pdf_buffer = generate_cover_letter_pdf(letter.content)
+
+    headers = {"Content-Disposition": f"attachment; filename=\"{filename}\""}
+    return StreamingResponse(pdf_buffer, media_type="application/pdf", headers=headers)
+
 
 
 @router.post("/{letter_id}/refine", response_model=CoverLetterResponse)

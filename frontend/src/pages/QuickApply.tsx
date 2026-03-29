@@ -12,6 +12,7 @@ import {
   CheckCircle,
   RefreshCw,
   X,
+  Download,
 } from 'lucide-react'
 import { useProfileStore } from '../stores/profileStore'
 
@@ -478,6 +479,29 @@ export default function QuickApply() {
     setTimeout(() => setCopyFeedback(''), 1500)
   }
 
+  const handleDownloadPdf = async () => {
+    if (!selectedVersionId || !jobDetails) return
+    try {
+      const response = await fetch(`/api/cover-letters/${selectedVersionId}/download`)
+      if (!response.ok) {
+        throw new Error('Failed to download PDF')
+      }
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = response.headers.get('content-disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'cover_letter.pdf'
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (err) {
+      console.error('Error downloading PDF:', err)
+      alert('Failed to download PDF')
+    }
+  }
+
+
   const handleReset = () => {
     setCurrentStep('input')
     setJobDetails(null)
@@ -889,6 +913,14 @@ export default function QuickApply() {
                   title="Copy to clipboard"
                 >
                   <Copy size={18} />
+                </button>
+                <button
+                  onClick={handleDownloadPdf}
+                  disabled={!selectedVersionId}
+                  className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+                  title="Download as PDF"
+                >
+                  <Download size={18} />
                 </button>
               </div>
             </div>

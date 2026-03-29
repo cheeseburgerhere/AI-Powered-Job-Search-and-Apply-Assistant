@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useCoverLetterStore } from '../stores/coverLetterStore'
 import { useJobStore } from '../stores/jobStore'
-import { Loader2, Copy, Check, RefreshCw, CheckCircle2, Pencil, Save, X } from 'lucide-react'
+import { Loader2, Copy, Check, RefreshCw, CheckCircle2, Pencil, Save, X, Download } from 'lucide-react'
 
 export default function CoverLetterEditor() {
   const [searchParams] = useSearchParams()
@@ -84,6 +84,29 @@ export default function CoverLetterEditor() {
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
+
+  const handleDownloadPdf = async () => {
+    if (!selectedLetter) return
+    try {
+      const response = await fetch(`/api/cover-letters/${selectedLetter.id}/download`)
+      if (!response.ok) {
+        throw new Error('Failed to download PDF')
+      }
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = response.headers.get('content-disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'cover_letter.pdf'
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (err) {
+      console.error('Error downloading PDF:', err)
+      alert('Failed to download PDF')
+    }
+  }
+
 
   const handleMarkReady = async () => {
     if (!selectedLetter) return
@@ -179,6 +202,14 @@ export default function CoverLetterEditor() {
                   {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
+                <button
+                  onClick={handleDownloadPdf}
+                  disabled={isEditing}
+                  className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-1"
+                >
+                  <Download size={14} />
+                  PDF
+                </button>
                 {!isEditing ? (
                   <button
                     onClick={() => setIsEditing(true)}
@@ -253,6 +284,14 @@ export default function CoverLetterEditor() {
 
             <div className="bg-white border border-gray-200 rounded-xl p-6">
               <h3 className="font-semibold text-sm mb-3">Actions</h3>
+              <button
+                onClick={handleDownloadPdf}
+                disabled={loading}
+                className="w-full px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2 mb-2"
+              >
+                <Download size={16} />
+                Download PDF
+              </button>
               <button
                 onClick={handleGenerate}
                 disabled={loading || !(selectedJobId ?? selectedLetter?.job_id)}
