@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Any
+from typing import Any, Optional
 
 
 class ApplyPlanResponse(BaseModel):
@@ -41,6 +41,10 @@ class ApplyRefineCoverLetterRequest(BaseModel):
     feedback: str
 
 
+class ApplyCoverLetterPdfRequest(BaseModel):
+    cover_letter: str
+
+
 class CompanyContextRequest(BaseModel):
     company: str
     company_website: str
@@ -50,6 +54,16 @@ class CompanyContextResponse(BaseModel):
     company: str
     company_website: str
     context_summary: str = ""
+
+
+class ApplyChatRequest(BaseModel):
+    question: str
+    job: Optional[JobDetailsFromLink] = None
+    cover_letter: Optional[str] = None
+
+
+class ApplyChatResponse(BaseModel):
+    answer: str
 
 
 class ScrapeDebugResponse(BaseModel):

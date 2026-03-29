@@ -18,6 +18,7 @@ from app.services.resume_parser import profile_to_text
 from app.services.ai_service import get_ai_service
 from app.services.company_info import fetch_company_info
 from app.services.pdf_generator import generate_cover_letter_pdf
+from app.routers.profile import _build_content_disposition
 
 router = APIRouter(prefix="/api/cover-letters", tags=["cover-letters"])
 
@@ -86,12 +87,19 @@ def download_cover_letter(letter_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Cover letter not found")
 
     job = db.query(Job).filter(Job.id == letter.job_id).first()
+    profile = db.query(Profile).first()
     job_title = job.title.replace(" ", "_").replace("/", "_") if job else "cover_letter"
     filename = f"{job_title}_v{letter.version}.pdf"
 
-    pdf_buffer = generate_cover_letter_pdf(letter.content)
+    author = (profile.full_name or "AI Job Assistant").strip() if profile else "AI Job Assistant"
+    pdf_buffer = generate_cover_letter_pdf(
+        letter.content,
+        filename=filename,
+        author=author,
+        title=f"{job.title} Cover Letter" if job else "Cover Letter",
+    )
 
-    headers = {"Content-Disposition": f"attachment; filename=\"{filename}\""}
+    headers = {"Content-Disposition": _build_content_disposition(filename)}
     return StreamingResponse(pdf_buffer, media_type="application/pdf", headers=headers)
 
 

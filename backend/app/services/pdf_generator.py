@@ -44,7 +44,12 @@ def _register_body_font() -> str:
     return font_name
 
 
-def generate_cover_letter_pdf(content: str, filename: str = "cover_letter.pdf") -> BytesIO:
+def generate_cover_letter_pdf(
+    content: str,
+    filename: str = "cover_letter.pdf",
+    author: str = "AI Job Assistant",
+    title: str = "Cover Letter",
+) -> BytesIO:
     """
     Generate a PDF from cover letter content.
     
@@ -56,7 +61,14 @@ def generate_cover_letter_pdf(content: str, filename: str = "cover_letter.pdf") 
         BytesIO object containing the PDF data
     """
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.75*inch, bottomMargin=0.75*inch)
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        topMargin=0.75 * inch,
+        bottomMargin=0.75 * inch,
+        author=author,
+        title=title,
+    )
     
     # Create styles
     styles = getSampleStyleSheet()
@@ -102,3 +114,22 @@ def generate_cover_letter_pdf(content: str, filename: str = "cover_letter.pdf") 
     doc.build(story)
     buffer.seek(0)
     return buffer
+
+
+def generate_text_pdf(
+    content: str,
+    filename: str = "document.pdf",
+    author: str = "AI Job Assistant",
+    title: str = "Document",
+) -> BytesIO:
+    """
+    Generate a PDF from arbitrary text content.
+
+    Args:
+        content: The text content
+        filename: Optional filename for the PDF
+
+    Returns:
+        BytesIO object containing the PDF data
+    """
+    return generate_cover_letter_pdf(content, filename=filename, author=author, title=title)

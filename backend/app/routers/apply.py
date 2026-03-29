@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -13,14 +14,19 @@ from app.schemas.apply import (
     ScrapeDebugResponse,
     ApplyGenerateCoverLetterRequest,
     ApplyRefineCoverLetterRequest,
+    ApplyCoverLetterPdfRequest,
     CompanyContextRequest,
     CompanyContextResponse,
+    ApplyChatRequest,
+    ApplyChatResponse,
 )
 from app.services.apply_planner import build_apply_plan
 from app.services.ai_service import get_ai_service
 from app.services.link_scraper import scrape_job_from_url
 from app.services.company_info import fetch_company_info
 from app.services.resume_parser import profile_to_text
+from app.services.pdf_generator import generate_text_pdf
+from app.routers.profile import _build_content_disposition
 
 router = APIRouter(prefix="/api/apply", tags=["apply"])
 
@@ -234,3 +240,53 @@ def refine_cover_letter_text(request: ApplyRefineCoverLetterRequest):
         return {"cover_letter": refined_content}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to refine cover letter: {str(exc)}")
+
+
+@router.post("/cover-letter/pdf")
+def download_cover_letter_pdf(request: ApplyCoverLetterPdfRequest, db: Session = Depends(get_db)):
+    if not request.cover_letter.strip():
+        raise HTTPException(status_code=400, detail="Cover letter cannot be empty")
+
+    profile = db.query(Profile).first()
+    author = (profile.full_name or "AI Job Assistant").strip() if profile else "AI Job Assistant"
+    filename = "cover_letter.pdf"
+    pdf_buffer = generate_text_pdf(
+        request.cover_letter,
+        filename=filename,
+        author=author,
+        title="Cover Letter",
+    )
+    headers = {"Content-Disposition": _build_content_disposition(filename)}
+    return StreamingResponse(pdf_buffer, media_type="application/pdf", headers=headers)
+
+
+@router.post("/chat", response_model=ApplyChatResponse)
+def apply_chat(request: ApplyChatRequest, db: Session = Depends(get_db)):
+    if not request.question.strip():
+        raise HTTPException(status_code=400, detail="Question is required")
+
+    profile = db.query(Profile).first()
+    if not profile:
+        raise HTTPException(status_code=400, detail="Profile not set up. Complete onboarding first.")
+
+    job = request.job
+    if not job:
+        raise HTTPException(status_code=400, detail="Job details are required")
+
+    profile_text = profile_to_text(profile)
+    cover_letter = (request.cover_letter or "").strip()
+
+    ai_service = get_ai_service()
+    try:
+        answer = ai_service.answer_apply_question(
+            profile_text=profile_text,
+            job_title=job.title,
+            job_company=job.company,
+            job_description=job.description,
+            cover_letter=cover_letter,
+            question=request.question,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to answer question: {str(exc)}")
+
+    return ApplyChatResponse(answer=answer)

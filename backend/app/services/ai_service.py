@@ -233,6 +233,27 @@ class AIService:
 
         return self._call(REFINE_SYSTEM, build_refine_prompt(current_letter, feedback), speed="general")
 
+    def answer_apply_question(
+        self,
+        profile_text: str,
+        job_title: str,
+        job_company: str,
+        job_description: str,
+        cover_letter: str,
+        question: str,
+    ) -> str:
+        from app.prompts.apply_chat import APPLY_CHAT_SYSTEM, build_apply_chat_prompt
+
+        prompt = build_apply_chat_prompt(
+            profile_text=profile_text,
+            job_title=job_title,
+            job_company=job_company,
+            job_description=job_description,
+            cover_letter=cover_letter,
+            question=question,
+        )
+        return self._call(APPLY_CHAT_SYSTEM, prompt, speed="general")
+
 
 # Singleton
 _ai_service = None

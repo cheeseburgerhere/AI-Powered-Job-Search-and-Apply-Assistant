@@ -1,6 +1,11 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
+from fastapi.responses import StreamingResponse, FileResponse
 from sqlalchemy.orm import Session
 from typing import Optional
+from pathlib import Path
+import uuid
+from urllib.parse import quote
+import unicodedata
 
 from app.database import get_db
 from app.models.profile import Profile
@@ -10,10 +15,19 @@ from app.schemas.profile import (
     PreferencesUpdate,
     WritingSampleInput,
 )
-from app.services.resume_parser import extract_text_from_pdf, parse_resume
+from app.services.resume_parser import extract_text_from_pdf, parse_resume, profile_to_text
+from app.services.pdf_generator import generate_text_pdf
 from app.services.ai_service import get_ai_service
 
 router = APIRouter(prefix="/api/profile", tags=["profile"])
+
+
+def _build_content_disposition(filename: str) -> str:
+    normalized = unicodedata.normalize("NFKD", filename)
+    ascii_name = normalized.encode("ascii", "ignore").decode("ascii") or "download.pdf"
+    ascii_name = ascii_name.replace(" ", "_")
+    utf8_name = quote(filename)
+    return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
 
 
 def _get_or_create_profile(db: Session) -> Profile:
@@ -48,6 +62,12 @@ async def upload_resume(
             raise HTTPException(status_code=400, detail="Only PDF files are supported")
         contents = await file.read()
         text = extract_text_from_pdf(contents)
+        upload_dir = Path(__file__).resolve().parent.parent / "data" / "uploads" / "resumes"
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        safe_name = file.filename.replace("..", "").replace("/", "_").replace("\\", "_")
+        stored_name = f"{uuid.uuid4().hex}_{safe_name}"
+        stored_path = upload_dir / stored_name
+        stored_path.write_bytes(contents)
     else:
         text = resume_text
 
@@ -57,6 +77,8 @@ async def upload_resume(
     # Update or create profile
     profile = _get_or_create_profile(db)
     profile.raw_resume_text = text
+    if file:
+        profile.resume_file_path = str(stored_path)
     profile.full_name = parsed.get("full_name", "")
     profile.email = parsed.get("email", "")
     profile.phone = parsed.get("phone", "")
@@ -121,3 +143,27 @@ def update_preferences(prefs: PreferencesUpdate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(profile)
     return profile
+
+
+@router.get("/resume/download")
+def download_resume(db: Session = Depends(get_db)):
+    profile = _get_or_create_profile(db)
+    resume_path = (profile.resume_file_path or "").strip()
+    if resume_path:
+        path = Path(resume_path)
+        if path.exists():
+            headers = {"Content-Disposition": _build_content_disposition(path.name)}
+            return FileResponse(path, media_type="application/pdf", headers=headers)
+
+    resume_text = (profile.raw_resume_text or "").strip()
+    if not resume_text:
+        resume_text = profile_to_text(profile).strip()
+
+    if not resume_text:
+        raise HTTPException(status_code=400, detail="Resume data not found. Upload a resume first.")
+
+    name_part = (profile.full_name or "resume").strip().replace(" ", "_")
+    filename = f"{name_part}_resume.pdf"
+    pdf_buffer = generate_text_pdf(resume_text, filename=filename, author=profile.full_name or "AI Job Assistant", title="Resume")
+    headers = {"Content-Disposition": _build_content_disposition(filename)}
+    return StreamingResponse(pdf_buffer, media_type="application/pdf", headers=headers)

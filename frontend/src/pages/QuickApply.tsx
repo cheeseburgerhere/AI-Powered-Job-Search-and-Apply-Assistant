@@ -40,7 +40,7 @@ interface CoverLetterVersion {
   status: string
 }
 
-type Step = 'input' | 'confirming' | 'generating' | 'reviewing' | 'applied'
+type Step = 'input' | 'confirming' | 'generating' | 'reviewing' | 'documents' | 'applied'
 
 export default function QuickApply() {
   const navigate = useNavigate()
@@ -66,6 +66,9 @@ export default function QuickApply() {
   const [isFetchingWebsiteFindings, setIsFetchingWebsiteFindings] = useState(false)
   const [versions, setVersions] = useState<CoverLetterVersion[]>([])
   const [selectedVersionId, setSelectedVersionId] = useState<number | null>(null)
+  const [currentStepChatInput, setCurrentStepChatInput] = useState('')
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
+  const [isChatting, setIsChatting] = useState(false)
 
   const loadCoverLetterVersions = useCallback(async (jobId: number) => {
     const response = await fetch(`/api/cover-letters?job_id=${jobId}`)
@@ -501,6 +504,97 @@ export default function QuickApply() {
     }
   }
 
+  const handleDownloadCoverLetterPdf = async () => {
+    if (!jobDetails) return
+
+    try {
+      const response = selectedVersionId
+        ? await fetch(`/api/cover-letters/${selectedVersionId}/download`)
+        : await fetch('/api/apply/cover-letter/pdf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cover_letter: coverLetter }),
+          })
+
+      if (!response.ok) {
+        throw new Error('Failed to download cover letter PDF')
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = response.headers.get('content-disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'cover_letter.pdf'
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (err) {
+      console.error('Error downloading cover letter PDF:', err)
+      alert('Failed to download cover letter PDF')
+    }
+  }
+
+  const handleDownloadResumePdf = async () => {
+    try {
+      const response = await fetch('/api/profile/resume/download')
+      if (!response.ok) {
+        throw new Error('Failed to download resume PDF')
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = response.headers.get('content-disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'resume.pdf'
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (err) {
+      console.error('Error downloading resume PDF:', err)
+      alert('Failed to download resume PDF')
+    }
+  }
+
+  const handleProceedToDocuments = () => {
+    setCurrentStep('documents')
+  }
+
+  const handleSendApplyChat = async () => {
+    if (!currentStepChatInput.trim() || !jobDetails) return
+
+    const question = currentStepChatInput.trim()
+    setCurrentStepChatInput('')
+    setChatMessages((prev) => [...prev, { role: 'user', content: question }])
+    setIsChatting(true)
+
+    try {
+      const response = await fetch('/api/apply/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question,
+          job: jobDetails,
+          cover_letter: coverLetter,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || 'Failed to get an answer')
+      }
+
+      const data: { answer: string } = await response.json()
+      setChatMessages((prev) => [...prev, { role: 'assistant', content: data.answer }])
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to get an answer'
+      setChatMessages((prev) => [...prev, { role: 'assistant', content: message }])
+    } finally {
+      setIsChatting(false)
+    }
+  }
+
 
   const handleReset = () => {
     setCurrentStep('input')
@@ -513,6 +607,8 @@ export default function QuickApply() {
     setWebsiteFindings(null)
     setVersions([])
     setSelectedVersionId(null)
+    setChatMessages([])
+    setCurrentStepChatInput('')
   }
 
   const handleFetchWebsiteFindings = useCallback(async () => {
@@ -639,13 +735,22 @@ export default function QuickApply() {
               <span>Details Extracted</span>
             </div>
             <div className="w-8 h-px bg-gray-300" />
-            <div className={`flex items-center gap-2 ${['generating', 'reviewing', 'applied'].includes(currentStep) ? 'text-blue-600' : 'text-gray-400'}`}>
-              {['generating', 'reviewing', 'applied'].includes(currentStep) ? (
+            <div className={`flex items-center gap-2 ${['generating', 'reviewing', 'documents', 'applied'].includes(currentStep) ? 'text-blue-600' : 'text-gray-400'}`}>
+              {['generating', 'reviewing', 'documents', 'applied'].includes(currentStep) ? (
                 <CheckCircle2 size={20} className="text-green-600" />
               ) : (
                 <div className="w-5 h-5 rounded-full border-2 border-gray-300" />
               )}
               <span>Cover Letter</span>
+            </div>
+            <div className="w-8 h-px bg-gray-300" />
+            <div className={`flex items-center gap-2 ${['documents', 'applied'].includes(currentStep) ? 'text-blue-600' : 'text-gray-400'}`}>
+              {['documents', 'applied'].includes(currentStep) ? (
+                <CheckCircle2 size={20} className="text-green-600" />
+              ) : (
+                <div className="w-5 h-5 rounded-full border-2 border-gray-300" />
+              )}
+              <span>Documents</span>
             </div>
             <div className="w-8 h-px bg-gray-300" />
             <div className={`flex items-center gap-2 ${currentStep === 'applied' ? 'text-green-600' : 'text-gray-400'}`}>
@@ -1034,25 +1139,122 @@ export default function QuickApply() {
                   Start Over
                 </button>
                 <button
-                  onClick={handleApplied}
+                  onClick={handleProceedToDocuments}
                   disabled={savingApply}
-                  className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
+                  className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
                 >
                   {savingApply ? (
                     <>
                       <Loader2 size={18} className="animate-spin" />
-                      Saving...
+                      Loading...
                     </>
                   ) : (
                     <>
                       <CheckCircle2 size={18} />
-                      Mark as Applied
+                      Continue to Documents
                     </>
                   )}
                 </button>
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* Step 5: Documents & AI Chat */}
+      {currentStep === 'documents' && jobDetails && (
+        <div className="space-y-6 max-w-4xl mx-auto">
+          <section className="bg-white border border-gray-200 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Download Application Files</h3>
+            <p className="text-sm text-gray-500 mb-4">Grab your latest CV and cover letter PDFs.</p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={handleDownloadResumePdf}
+                className="flex-1 px-4 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors font-medium flex items-center justify-center gap-2"
+              >
+                <Download size={18} />
+                Download CV (PDF)
+              </button>
+              <button
+                onClick={handleDownloadCoverLetterPdf}
+                disabled={!coverLetter.trim()}
+                className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
+              >
+                <Download size={18} />
+                Download Cover Letter (PDF)
+              </button>
+            </div>
+          </section>
+
+          <section className="bg-white border border-gray-200 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Ask Anything</h3>
+            <p className="text-sm text-gray-500 mb-4">Get AI help for unusual requirements or last-minute questions.</p>
+            <div className="space-y-3">
+              <div className="max-h-64 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3 bg-gray-50">
+                {chatMessages.length === 0 ? (
+                  <p className="text-sm text-gray-500">No questions yet. Ask about custom requirements or tweaks.</p>
+                ) : (
+                  chatMessages.map((msg, idx) => (
+                    <div
+                      key={`${msg.role}-${idx}`}
+                      className={`text-sm rounded-lg px-3 py-2 ${
+                        msg.role === 'user' ? 'bg-blue-100 text-blue-900' : 'bg-white border border-gray-200 text-gray-800'
+                      }`}
+                    >
+                      {msg.content}
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={currentStepChatInput}
+                  onChange={(e) => setCurrentStepChatInput(e.target.value)}
+                  placeholder="Ask about anything unusual for this application..."
+                  className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSendApplyChat()
+                    }
+                  }}
+                />
+                <button
+                  onClick={handleSendApplyChat}
+                  disabled={isChatting || !currentStepChatInput.trim()}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
+                >
+                  {isChatting ? 'Thinking...' : 'Ask'}
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => setCurrentStep('reviewing')}
+              className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+            >
+              Back to Cover Letter
+            </button>
+            <button
+              onClick={handleApplied}
+              disabled={savingApply}
+              className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
+            >
+              {savingApply ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 size={18} />
+                  Mark as Applied
+                </>
+              )}
+            </button>
+          </div>
         </div>
       )}
 
