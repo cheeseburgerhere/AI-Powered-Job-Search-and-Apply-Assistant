@@ -17,6 +17,14 @@ class JobCreate(BaseModel):
 
 
 class JobUpdate(BaseModel):
+    title: Optional[str] = None
+    company: Optional[str] = None
+    description: Optional[str] = None
+    url: Optional[str] = None
+    location: Optional[str] = None
+    remote_type: Optional[str] = None
+    salary_min: Optional[int] = None
+    salary_max: Optional[int] = None
     status: Optional[str] = None
     notes: Optional[str] = None
     next_follow_up: Optional[datetime] = None

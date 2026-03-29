@@ -14,6 +14,7 @@ import {
   X,
   Download,
 } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
 import { useProfileStore } from '../stores/profileStore'
 
 interface JobDetails {
@@ -246,6 +247,19 @@ export default function QuickApply() {
         company_info: data.company_info || '',
       })
       setInputLink(url)
+      setWebsiteFindings(null)
+      if (savedInterestedId) {
+        await fetch(`/api/jobs/${savedInterestedId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: data.title,
+            company: data.company,
+            description: data.description,
+            url,
+          }),
+        })
+      }
       if (currentStep === 'reviewing') {
         setCurrentStep('confirming')
       }
@@ -255,7 +269,7 @@ export default function QuickApply() {
     } finally {
       setIsRescraping(false)
     }
-  }, [jobDetails?.link, inputLink, currentStep])
+  }, [jobDetails?.link, inputLink, currentStep, savedInterestedId])
 
   const handleSaveInterested = useCallback(async () => {
     if (!jobDetails || savingInterested || savedInterestedId) return
@@ -1197,11 +1211,15 @@ export default function QuickApply() {
                   chatMessages.map((msg, idx) => (
                     <div
                       key={`${msg.role}-${idx}`}
-                      className={`text-sm rounded-lg px-3 py-2 ${
-                        msg.role === 'user' ? 'bg-blue-100 text-blue-900' : 'bg-white border border-gray-200 text-gray-800'
+                      className={`text-sm rounded-lg px-3 py-2 shadow-sm ${
+                        msg.role === 'user'
+                          ? 'bg-gradient-to-r from-blue-600 to-sky-500 text-white'
+                          : 'bg-slate-900 text-slate-100 border border-slate-800'
                       }`}
                     >
-                      {msg.content}
+                      <ReactMarkdown className="prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-ol:my-2">
+                        {msg.content}
+                      </ReactMarkdown>
                     </div>
                   ))
                 )}

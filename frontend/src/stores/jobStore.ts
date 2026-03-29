@@ -50,7 +50,22 @@ interface JobState {
 
   fetchJobs: (status?: string) => Promise<void>
   createJob: (data: { title: string; company: string; description: string; url?: string; location?: string; remote_type?: string }) => Promise<Job>
-  updateJob: (id: number, data: { status?: string; notes?: string; next_follow_up?: string }) => Promise<void>
+  updateJob: (
+    id: number,
+    data: {
+      title?: string
+      company?: string
+      description?: string
+      url?: string
+      location?: string
+      remote_type?: string
+      salary_min?: number | null
+      salary_max?: number | null
+      status?: string
+      notes?: string
+      next_follow_up?: string
+    }
+  ) => Promise<void>
   deleteJob: (id: number) => Promise<void>
   scoreJob: (id: number) => Promise<void>
   searchJobs: (filters: JobSearchFilters) => Promise<Job[]>
