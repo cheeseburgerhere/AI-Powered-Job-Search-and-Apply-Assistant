@@ -59,6 +59,32 @@ def to_int(value: Any) -> int | None:
         return None
 
 
+def http_get_html(url: str, timeout: int = 60) -> str:
+    """Fetch a URL and return the raw HTML as a string.
+
+    Uses a browser-like User-Agent to avoid simple bot blocks.
+    Returns an empty string on any failure so callers can fall back gracefully.
+    """
+    request = urllib.request.Request(
+        url=url,
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return response.read().decode("utf-8", errors="ignore")
+    except Exception:
+        return ""
+
+
 def is_real_secret(value: str | None) -> bool:
     """Check if a string looks like a real API key (not a placeholder)."""
     if not value:

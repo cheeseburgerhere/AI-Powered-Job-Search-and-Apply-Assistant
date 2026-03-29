@@ -430,9 +430,15 @@ export default function JobFeed() {
       )}
 
       <div className="space-y-3">
-        {jobs.map((job) => (
-          <JobCard key={job.id} job={job} onScore={handleScore} onDelete={deleteJob} scoring={scoring === job.id} />
-        ))}
+        {[...jobs]
+          .sort((a, b) => {
+            const dateA = a.date_saved ? new Date(a.date_saved).getTime() : 0;
+            const dateB = b.date_saved ? new Date(b.date_saved).getTime() : 0;
+            return dateA - dateB;
+          })
+          .map((job) => (
+            <JobCard key={job.id} job={job} onScore={handleScore} onDelete={deleteJob} scoring={scoring === job.id} />
+          ))}
       </div>
     </div>
   )

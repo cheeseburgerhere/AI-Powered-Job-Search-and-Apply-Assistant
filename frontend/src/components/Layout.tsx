@@ -1,12 +1,12 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { FileText, Briefcase, PenTool, Kanban, LayoutDashboard, Bot, Send } from 'lucide-react'
+import { FileText, Briefcase, PenTool, Kanban, LayoutDashboard, Send } from 'lucide-react'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, match: (p: string) => p === '/' },
   { to: '/onboarding', label: 'Profile', icon: FileText, match: (p: string) => p === '/onboarding' },
   { to: '/jobs', label: 'Jobs', icon: Briefcase, match: (p: string) => p.startsWith('/jobs') },
   { to: '/apply', label: 'Apply', icon: Send, match: (p: string) => p === '/apply' },
-  { to: '/job-board-agent', label: 'Job Board Agent', icon: Bot, match: (p: string) => p === '/job-board-agent' },
+  // { to: '/job-board-agent', label: 'Job Board Agent', icon: Bot, match: (p: string) => p === '/job-board-agent' },
   { to: '/cover-letters', label: 'Cover Letters', icon: PenTool, match: (p: string) => p === '/cover-letters' },
   { to: '/tracker', label: 'Tracker', icon: Kanban, match: (p: string) => p === '/tracker' },
 ]
