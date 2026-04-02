@@ -1,3 +1,6 @@
+import argparse
+import sys
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import create_tables
@@ -8,7 +11,12 @@ app = FastAPI(title="AI Job Assistant", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",   # Vite dev server
+        "http://localhost:*",      # Any localhost port (Electron)
+        "file://",                 # Electron file:// protocol
+        "*",                       # Fallback for desktop packaging
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -34,3 +42,18 @@ def health():
         "status": "ok",
         "ai_provider": (settings.ai_provider or "anthropic").lower(),
     }
+
+
+# ---------------------------------------------------------------------------
+# CLI entry-point (used by PyInstaller / Electron)
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    import uvicorn
+
+    parser = argparse.ArgumentParser(description="AI Job Assistant Backend")
+    parser.add_argument("--port", type=int, default=8000, help="Port to listen on")
+    parser.add_argument("--host", type=str, default="127.0.0.1", help="Host to bind")
+    args = parser.parse_args()
+
+    uvicorn.run(app, host=args.host, port=args.port)
+
