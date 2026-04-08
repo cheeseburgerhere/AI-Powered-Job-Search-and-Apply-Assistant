@@ -194,7 +194,7 @@ All optional. The more you add, the broader your search results:
 
 ## License
 
-This project is open source. See the repository for license details.
+This project is open source.
 
 ---
 
