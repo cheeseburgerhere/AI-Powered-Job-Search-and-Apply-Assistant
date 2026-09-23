@@ -15,6 +15,8 @@ export interface Job {
   url: string | null
   fit_score: number | null
   fit_reasoning: string | null
+  category: string
+  priority: string
   status: string
   date_saved: string | null
   date_applied: string | null

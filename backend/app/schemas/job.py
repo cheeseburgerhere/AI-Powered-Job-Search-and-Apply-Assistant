@@ -45,6 +45,8 @@ class JobResponse(BaseModel):
     url: Optional[str] = None
     fit_score: Optional[float] = None
     fit_reasoning: Optional[str] = None
+    category: str = ""
+    priority: str = ""
     status: str
     date_saved: Optional[datetime] = None
     date_applied: Optional[datetime] = None

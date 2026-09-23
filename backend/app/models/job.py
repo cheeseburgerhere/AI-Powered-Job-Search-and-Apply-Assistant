@@ -20,6 +20,8 @@ class Job(Base):
     url = Column(String, nullable=True)
     fit_score = Column(Float, nullable=True)
     fit_reasoning = Column(Text, nullable=True)
+    category = Column(String, nullable=False, default="")
+    priority = Column(String, nullable=False, default="")
     status = Column(String, default="interested")
     date_saved = Column(DateTime(timezone=True), server_default=func.now())
     date_applied = Column(DateTime(timezone=True), nullable=True)

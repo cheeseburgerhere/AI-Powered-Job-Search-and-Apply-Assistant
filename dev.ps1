@@ -87,7 +87,7 @@ function Ensure-BackendEnv {
   if (-not (Test-Path $activatePath)) {
     Write-Host "Creating backend virtual environment..."
     $py = Get-PythonLauncher
-    & $py.FilePath @($py.PrefixArgs + @("-m", "venv", (Join-Path $BackendDir "venv")))
+    & $py.FilePath @($py.PrefixArgs + @("-m", "venv", (Join-Path $BackendDir ".venv")))
   }
 
   & $venvPython -c "import uvicorn" *> $null

@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from app.config import get_settings
 import os
@@ -31,3 +31,21 @@ def get_db():
 
 def create_tables():
     Base.metadata.create_all(bind=engine)
+    _add_missing_job_columns()
+
+
+def _add_missing_job_columns():
+    """Expand older SQLite databases without deleting or rewriting job data."""
+    inspector = inspect(engine)
+    if "jobs" not in inspector.get_table_names():
+        return
+
+    existing = {column["name"] for column in inspector.get_columns("jobs")}
+    additions = {
+        "category": "VARCHAR NOT NULL DEFAULT ''",
+        "priority": "VARCHAR NOT NULL DEFAULT ''",
+    }
+    with engine.begin() as connection:
+        for name, definition in additions.items():
+            if name not in existing:
+                connection.execute(text(f"ALTER TABLE jobs ADD COLUMN {name} {definition}"))

@@ -1,0 +1,9 @@
+[mcp_servers.codegraph]
+command = "npx"
+args = ["--yes", "@colbymchenry/codegraph@1.6.0", "serve", "--mcp"]
+
+[mcp_servers.job-assistant]
+command = "backend/.venv/Scripts/python.exe"
+args = ["backend/mcp_server.py"]
+cwd = "."
+tool_timeout_sec = 120

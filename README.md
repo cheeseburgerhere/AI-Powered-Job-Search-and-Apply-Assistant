@@ -101,6 +101,39 @@ This starts:
 
 Press `Ctrl+C` to stop both. Run `./dev.sh stop` to kill any orphaned processes.
 
+### MCP companion mode
+
+The local MCP server lets Codex or Claude search and save jobs, analyze them with the harness model, update the tracker, and save cover-letter drafts into the same database used by the web UI. It does not call a second LLM or submit applications.
+
+Create a project-local virtual environment (Conda is not used):
+
+```powershell
+python -m venv backend/.venv
+backend/.venv/Scripts/python.exe -m pip install -r backend/requirements.txt
+```
+
+The checked-in `.codex/config.toml` and `.mcp.json` register both the job assistant and CodeGraph for Codex and Claude Code. Restart the harness after creating the virtual environment. If your harness does not load project MCP configuration, add the job server manually from the repository root:
+
+```powershell
+# Codex
+codex mcp add job-assistant -- .\backend\.venv\Scripts\python.exe .\backend\mcp_server.py
+
+# Claude Code
+claude mcp add --scope project --transport stdio job-assistant -- .\backend\.venv\Scripts\python.exe .\backend\mcp_server.py
+```
+
+On macOS or Linux, replace `backend/.venv/Scripts/python.exe` with `backend/.venv/bin/python`. Restart the harness after adding the server, then verify it with `/mcp`.
+
+Available tools cover profile context, job search and persistence, saved-job filtering, application context, job analysis, tracker updates, cover-letter versioning, and tracker summaries. Job descriptions are treated as untrusted data, contact details are excluded by default, and no deletion or application-submission tool is exposed.
+
+Broad job search uses any configured JSearch, Adzuna, or Brave credentials. The key-free Greenhouse, Lever, and Ashby adapters require `company_slugs` so the agent knows which company boards to query.
+
+CodeGraph's machine-local index is intentionally ignored by Git. Build or refresh it after cloning:
+
+```powershell
+npx --yes @colbymchenry/codegraph@1.6.0 index
+```
+
 #### Manual Setup
 
 If you want more control:

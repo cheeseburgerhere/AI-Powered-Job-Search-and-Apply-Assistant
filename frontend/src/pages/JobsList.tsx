@@ -236,6 +236,16 @@ function JobCard({
           <div className="flex items-center gap-3">
             <h3 className="font-semibold text-gray-900">{displayJobTitle(job)}</h3>
             {job.fit_score !== null && <FitScoreBadge score={job.fit_score} />}
+            {job.category && (
+              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-50 text-indigo-700">
+                {job.category}
+              </span>
+            )}
+            {job.priority && (
+              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-orange-50 text-orange-700 capitalize">
+                {job.priority} priority
+              </span>
+            )}
           </div>
           <p className="text-sm text-gray-500 mt-1">
             {job.company}

@@ -8,6 +8,7 @@ from urllib.parse import quote
 import unicodedata
 
 from app.database import get_db
+from app.config import get_settings
 from app.models.profile import Profile
 from app.schemas.profile import (
     ProfileResponse,
@@ -18,6 +19,7 @@ from app.schemas.profile import (
 from app.services.resume_parser import extract_text_from_pdf, parse_resume, profile_to_text
 from app.services.pdf_generator import generate_text_pdf
 from app.services.ai_service import get_ai_service
+from app.services.helpers import is_real_secret
 
 router = APIRouter(prefix="/api/profile", tags=["profile"])
 
@@ -71,23 +73,29 @@ async def upload_resume(
     else:
         text = resume_text
 
-    # Parse with AI
-    parsed = parse_resume(text)
+    settings = get_settings()
+    provider_key = {
+        "anthropic": settings.anthropic_api_key,
+        "gemini": settings.gemini_api_key,
+        "qwen": settings.qwen_api_key,
+    }.get((settings.ai_provider or "anthropic").strip().lower(), "")
+    parsed = parse_resume(text) if is_real_secret(provider_key) else {}
 
     # Update or create profile
     profile = _get_or_create_profile(db)
     profile.raw_resume_text = text
     if file:
         profile.resume_file_path = str(stored_path)
-    profile.full_name = parsed.get("full_name", "")
-    profile.email = parsed.get("email", "")
-    profile.phone = parsed.get("phone", "")
-    profile.location = parsed.get("location", "")
-    profile.summary = parsed.get("summary", "")
-    profile.skills = parsed.get("skills", [])
-    profile.experiences = parsed.get("experiences", [])
-    profile.education = parsed.get("education", [])
-    profile.certifications = parsed.get("certifications", [])
+    if parsed:
+        profile.full_name = parsed.get("full_name", "")
+        profile.email = parsed.get("email", "")
+        profile.phone = parsed.get("phone", "")
+        profile.location = parsed.get("location", "")
+        profile.summary = parsed.get("summary", "")
+        profile.skills = parsed.get("skills", [])
+        profile.experiences = parsed.get("experiences", [])
+        profile.education = parsed.get("education", [])
+        profile.certifications = parsed.get("certifications", [])
 
     db.commit()
     db.refresh(profile)
