@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, ForeignKey
+from app.models.types import UTCDateTime
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -18,7 +19,7 @@ class CoverLetter(Base):
     feedback = Column(Text, nullable=True)
     status = Column(String, default="draft")  # "draft", "ready"
     source = Column(String, nullable=False, default="")  # see LETTER_SOURCES
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_at = Column(UTCDateTime(), server_default=func.now())
+    updated_at = Column(UTCDateTime(), server_default=func.now(), onupdate=func.now())
 
     job = relationship("Job", back_populates="cover_letters")

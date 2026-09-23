@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, Text, DateTime
+from sqlalchemy import Column, Integer, String, Float, Boolean, Text
+from app.models.types import UTCDateTime
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -19,6 +20,6 @@ class JobBoard(Base):
     auto_apply_enabled = Column(Boolean, default=False)
     apply_mode = Column(String, default="manual_review")
     notes = Column(Text, nullable=True)
-    last_run_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    last_run_at = Column(UTCDateTime(), nullable=True)
+    created_at = Column(UTCDateTime(), server_default=func.now())
+    updated_at = Column(UTCDateTime(), server_default=func.now(), onupdate=func.now())

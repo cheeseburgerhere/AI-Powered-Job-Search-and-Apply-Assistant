@@ -115,6 +115,22 @@ class MCPServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rejected.status_code, 400)
         self.assertNotIn("Rejected", titles)
 
+    def test_timestamps_round_trip_as_utc(self):
+        istanbul = timezone(timedelta(hours=3))
+        with SessionLocal() as db:
+            job = db.query(Job).first()
+            job.next_follow_up = datetime(2026, 10, 7, 19, 30, tzinfo=istanbul)
+            job_id = job.id
+            db.commit()
+        with TestClient(app) as client:
+            body = client.get(f"/api/jobs/{job_id}").json()
+
+        follow_up = datetime.fromisoformat(body["next_follow_up"].replace("Z", "+00:00"))
+        created = datetime.fromisoformat(body["created_at"].replace("Z", "+00:00"))
+        self.assertEqual(follow_up, datetime(2026, 10, 7, 16, 30, tzinfo=timezone.utc))
+        self.assertEqual(follow_up.utcoffset(), timedelta(0))
+        self.assertIsNotNone(created.tzinfo)
+
     def test_nudges_lists_applied_jobs_past_follow_up(self):
         with SessionLocal() as db:
             job = db.query(Job).first()

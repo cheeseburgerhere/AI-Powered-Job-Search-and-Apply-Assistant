@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Text, Float, DateTime, JSON
+from sqlalchemy import Column, Integer, String, Text, Float, JSON
+from app.models.types import UTCDateTime
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -24,13 +25,13 @@ class Job(Base):
     category = Column(String, nullable=False, default="")
     priority = Column(String, nullable=False, default="")
     status = Column(String, default="interested")
-    date_saved = Column(DateTime(timezone=True), server_default=func.now())
-    date_applied = Column(DateTime(timezone=True), nullable=True)
-    next_follow_up = Column(DateTime(timezone=True), nullable=True)
+    date_saved = Column(UTCDateTime(), server_default=func.now())
+    date_applied = Column(UTCDateTime(), nullable=True)
+    next_follow_up = Column(UTCDateTime(), nullable=True)
     notes = Column(Text, nullable=True)
     link_type = Column(String, nullable=True)  # "job", "board", "expired"
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_at = Column(UTCDateTime(), server_default=func.now())
+    updated_at = Column(UTCDateTime(), server_default=func.now(), onupdate=func.now())
 
     cover_letters = relationship("CoverLetter", back_populates="job", cascade="all, delete-orphan")
     tracker_events = relationship("TrackerEvent", back_populates="job", cascade="all, delete-orphan")

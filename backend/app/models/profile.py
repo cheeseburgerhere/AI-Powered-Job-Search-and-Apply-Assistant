@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, JSON
+from sqlalchemy import Column, Integer, String, Text, JSON
+from app.models.types import UTCDateTime
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -21,5 +22,5 @@ class Profile(Base):
     writing_samples = Column(JSON, default=list)
     voice_profile = Column(Text, default="")
     preferences = Column(JSON, default=dict)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_at = Column(UTCDateTime(), server_default=func.now())
+    updated_at = Column(UTCDateTime(), server_default=func.now(), onupdate=func.now())

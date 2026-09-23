@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, ForeignKey
+from app.models.types import UTCDateTime
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -12,6 +13,6 @@ class TrackerEvent(Base):
     from_status = Column(String, default="")
     to_status = Column(String, default="")
     note = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(UTCDateTime(), server_default=func.now())
 
     job = relationship("Job", back_populates="tracker_events")
