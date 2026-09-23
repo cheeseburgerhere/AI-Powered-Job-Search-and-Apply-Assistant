@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.cover_letter import LETTER_SOURCES
 from app.models.job import Job
-from app.models.tracker import TrackerEvent
 from app.schemas.job import JobCreate, JobUpdate, JobResponse, JobSearchRequest
 from app.services.resume_parser import profile_to_text
 from app.services.ai_service import get_ai_service
@@ -50,16 +49,18 @@ def create_job(job_data: JobCreate, db: Session = Depends(get_db)):
         salary_min=job_data.salary_min,
         salary_max=job_data.salary_max,
         source="manual",
-        status=job_data.status or "interested",
+        status="",
     )
     db.add(job)
-    db.commit()
-    db.refresh(job)
+    db.flush()
 
-    # Create initial tracker event
-    event = TrackerEvent(job_id=job.id, from_status="", to_status=job.status)
-    db.add(event)
-    db.commit()
+    # Same path as later status changes: records the initial tracker event and, for jobs
+    # created as applied, the application date and follow-up reminder.
+    try:
+        set_job_status(db, job, job_data.status or "interested")
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # Save cover letter if provided
     if job_data.cover_letter:
@@ -72,8 +73,9 @@ def create_job(job_data: JobCreate, db: Session = Depends(get_db)):
             source=letter_source,
         )
         db.add(letter)
-        db.commit()
 
+    db.commit()
+    db.refresh(job)
     return job
 
 

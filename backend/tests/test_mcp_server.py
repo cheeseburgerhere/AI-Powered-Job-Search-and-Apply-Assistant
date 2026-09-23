@@ -115,6 +115,25 @@ class MCPServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rejected.status_code, 400)
         self.assertNotIn("Rejected", titles)
 
+    def test_job_created_as_applied_gets_dates_and_event(self):
+        with TestClient(app) as client:
+            created = client.post(
+                "/api/jobs",
+                json={"title": "SRE", "company": "Example Labs", "description": "On-call.", "status": "applied"},
+            ).json()
+            history = client.get("/api/tracker/events", params={"job_id": created["id"]}).json()
+            invalid = client.post(
+                "/api/jobs", json={"title": "Bad", "company": "Nowhere", "description": "x", "status": "hired"}
+            )
+            titles = [job["title"] for job in client.get("/api/jobs").json()]
+
+        self.assertEqual(created["status"], "applied")
+        self.assertIsNotNone(created["date_applied"])
+        self.assertIsNotNone(created["next_follow_up"])
+        self.assertEqual([(e["from_status"], e["to_status"]) for e in history], [("", "applied")])
+        self.assertEqual(invalid.status_code, 400)
+        self.assertNotIn("Bad", titles)
+
     def test_timestamps_round_trip_as_utc(self):
         istanbul = timezone(timedelta(hours=3))
         with SessionLocal() as db:

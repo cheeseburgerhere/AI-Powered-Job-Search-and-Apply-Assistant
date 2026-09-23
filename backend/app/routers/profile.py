@@ -153,7 +153,10 @@ def download_resume(db: Session = Depends(get_db)):
     if resume_path:
         path = Path(resume_path)
         if path.exists():
-            headers = {"Content-Disposition": _build_content_disposition(path.name)}
+            # Stored as "<uuid hex>_<original name>"; hand back the original name.
+            prefix, _, original = path.name.partition("_")
+            download_name = original if len(prefix) == 32 and original else path.name
+            headers = {"Content-Disposition": _build_content_disposition(download_name)}
             return FileResponse(path, media_type="application/pdf", headers=headers)
 
     resume_text = (profile.raw_resume_text or "").strip()
