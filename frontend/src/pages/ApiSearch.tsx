@@ -68,7 +68,7 @@ export default function ApiSearch() {
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <button
-          onClick={() => navigate('/jobs/find')}
+          onClick={() => navigate('/find')}
           className="p-2 text-gray-400 hover:text-gray-900 transition-colors"
         >
           <ArrowLeft size={20} />
@@ -236,7 +236,7 @@ export default function ApiSearch() {
       {/* Link to view results */}
       {searchSummary && searchSummary.includes('Found') && !searchSummary.includes('Found 0') && (
         <button
-          onClick={() => navigate('/jobs/list')}
+          onClick={() => navigate('/jobs')}
           className="w-full py-3 bg-emerald-50 text-emerald-700 text-sm font-medium rounded-xl hover:bg-emerald-100 transition-colors"
         >
           View found jobs

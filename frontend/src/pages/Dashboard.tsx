@@ -37,7 +37,7 @@ export default function Dashboard() {
             Upload your resume to unlock job matching, cover letter generation, and more.
           </p>
           <Link
-            to="/onboarding"
+            to="/profile"
             className="inline-block mt-3 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
           >
             Go to Profile Setup
@@ -94,7 +94,7 @@ export default function Dashboard() {
           <p className="text-sm text-gray-500 mt-1">Paste a job description and get a fit score</p>
         </Link>
         <Link
-          to="/cover-letters"
+          to="/letters"
           className="bg-white border border-gray-200 rounded-xl p-5 hover:border-blue-300 hover:shadow-sm transition-all"
         >
           <FileText size={24} className="text-purple-600 mb-2" />

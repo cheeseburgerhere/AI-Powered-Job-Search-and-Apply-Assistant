@@ -286,7 +286,7 @@ function JobCard({
             </Link>
           )}
           <Link
-            to={`/cover-letters?job_id=${job.id}`}
+            to={`/letters?job_id=${job.id}`}
             className="px-3 py-1.5 text-xs font-medium bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100"
           >
             Cover Letter

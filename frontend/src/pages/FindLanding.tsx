@@ -19,7 +19,7 @@ export default function FindLanding() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-3xl">
         <button
-          onClick={() => navigate('/jobs/find/api')}
+          onClick={() => navigate('/find/api')}
           className="group flex flex-col items-center justify-center gap-4 bg-white border-2 border-gray-200 rounded-2xl p-12 hover:border-blue-500 hover:shadow-lg transition-all cursor-pointer"
         >
           <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
@@ -33,7 +33,7 @@ export default function FindLanding() {
         </button>
 
         <button
-          onClick={() => navigate('/jobs/find/scrape')}
+          onClick={() => navigate('/find/boards')}
           className="group flex flex-col items-center justify-center gap-4 bg-white border-2 border-gray-200 rounded-2xl p-12 hover:border-amber-500 hover:shadow-lg transition-all cursor-pointer"
         >
           <div className="w-16 h-16 rounded-2xl bg-amber-50 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
