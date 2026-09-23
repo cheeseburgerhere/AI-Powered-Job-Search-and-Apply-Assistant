@@ -106,7 +106,8 @@ function ResumeSection({ profile }: { profile: ProfileData }) {
       ) : profile.full_name ? (
         <p className="text-sm text-ink-muted">
           Parsed for <span className="text-ink">{profile.full_name}</span>
-          {profile.resume_file_path ? ' from an uploaded PDF.' : ' from pasted text.'} Uploading again replaces it.
+          {profile.resume_file_path ? ' from an uploaded PDF.' : ' from pasted text.'}{' '}
+          {serverAi ? 'Uploading again replaces it.' : 'Upload a newer version and your agent re-parses it.'}
         </p>
       ) : (
         <p className="text-sm text-ink-muted">No resume yet. Upload a PDF or paste the text.</p>
@@ -187,7 +188,7 @@ function ProfileDetails({ profile }: { profile: ProfileData }) {
           )
         }
       >
-        Parsed profile
+        {profile.needs_parsing ? 'Parsed profile · from your previous resume' : 'Parsed profile'}
       </SectionHeading>
 
       {editing ? (

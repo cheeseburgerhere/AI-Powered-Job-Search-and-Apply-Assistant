@@ -35,14 +35,18 @@ export default function Today() {
 
   const jobsById = useMemo(() => new Map(jobs.map((job) => [job.id, job])), [jobs])
 
-  // The newest version per job is the one that matters; older drafts are history.
+  // The newest version per job is the one that matters; older drafts are history. Once a
+  // job is applied to (or rejected), its draft no longer needs a decision.
   const draftsAwaiting = useMemo(() => {
     const latest = new Map<number, CoverLetter>()
     for (const letter of allLetters) {
       const current = latest.get(letter.job_id)
       if (!current || letter.version > current.version) latest.set(letter.job_id, letter)
     }
-    return [...latest.values()].filter((letter) => letter.status === 'draft' && jobsById.has(letter.job_id))
+    return [...latest.values()].filter((letter) => {
+      const job = jobsById.get(letter.job_id)
+      return letter.status === 'draft' && job !== undefined && OPEN_STATUSES.has(job.status)
+    })
   }, [allLetters, jobsById])
 
   const unanalysed = jobs.filter((job) => OPEN_STATUSES.has(job.status) && !isAnalysed(job))

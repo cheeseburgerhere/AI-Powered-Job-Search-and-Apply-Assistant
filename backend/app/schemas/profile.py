@@ -76,6 +76,7 @@ class ProfileResponse(ProfileBase):
     id: int
     raw_resume_text: str = ""
     resume_file_path: Optional[str] = None
+    resume_parsed: bool = True
     writing_samples: list[str] = []
     voice_profile: str = ""
     created_at: Optional[datetime] = None
@@ -86,5 +87,6 @@ class ProfileResponse(ProfileBase):
     @computed_field
     @property
     def needs_parsing(self) -> bool:
-        """Resume text is stored but nobody has structured it into a profile yet."""
-        return bool((self.raw_resume_text or "").strip()) and not (self.full_name or "").strip()
+        """Resume text is stored but its structured profile hasn't been (re)built from it yet."""
+        has_text = bool((self.raw_resume_text or "").strip())
+        return has_text and (not self.resume_parsed or not (self.full_name or "").strip())

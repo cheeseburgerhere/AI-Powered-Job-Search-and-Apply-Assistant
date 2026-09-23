@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, JSON
+from sqlalchemy import Boolean, Column, Integer, String, Text, JSON
 from app.models.types import UTCDateTime
 from sqlalchemy.sql import func
 from app.database import Base
@@ -15,6 +15,8 @@ class Profile(Base):
     summary = Column(Text, default="")
     raw_resume_text = Column(Text, default="")
     resume_file_path = Column(String, nullable=True)
+    # False while raw_resume_text holds an upload that nobody has structured yet (no server AI).
+    resume_parsed = Column(Boolean, nullable=False, default=True)
     skills = Column(JSON, default=list)
     experiences = Column(JSON, default=list)
     education = Column(JSON, default=list)

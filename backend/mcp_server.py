@@ -164,6 +164,7 @@ def save_profile_from_resume(
             db.add(profile)
         for key, value in update.model_dump().items():
             setattr(profile, key, value)
+        profile.resume_parsed = True
         db.commit()
         db.refresh(profile)
         return {

@@ -171,6 +171,45 @@ class MCPServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["raw_resume_text"], "Ada Candidate\nBackend engineer")
 
+    async def test_new_resume_upload_waits_for_agent_reparse(self):
+        with patch("app.routers.profile.server_ai_configured", return_value=False):
+            with TestClient(app) as client:
+                uploaded = client.post("/api/profile/upload-resume", data={"resume_text": "Ada Candidate\nStaff engineer"})
+        # The old structured profile (full_name set) must not hide that this text is unparsed.
+        self.assertEqual(uploaded.json()["full_name"], "Ada Candidate")
+        self.assertTrue(uploaded.json()["needs_parsing"])
+
+        async with Client(mcp, raise_exceptions=True) as agent:
+            await agent.call_tool(
+                "save_profile_from_resume",
+                {
+                    "full_name": "Ada Candidate",
+                    "email": "",
+                    "phone": "",
+                    "location": "Remote",
+                    "summary": "Staff engineer",
+                    "skills": ["Python"],
+                    "experiences": [],
+                    "education": [],
+                },
+            )
+        with TestClient(app) as client:
+            self.assertFalse(client.get("/api/profile").json()["needs_parsing"])
+
+    def test_resume_parsed_migration_marks_nameless_text_unparsed(self):
+        with SessionLocal() as db:
+            profile = db.query(Profile).first()
+            profile.full_name = ""
+            profile.raw_resume_text = "Ada Candidate"
+            db.commit()
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE profiles DROP COLUMN resume_parsed"))
+
+        create_tables()
+
+        with engine.connect() as connection:
+            self.assertEqual(connection.execute(text("SELECT resume_parsed FROM profiles")).scalar_one(), 0)
+
     def test_profile_reports_resume_waiting_for_agent_parse(self):
         with SessionLocal() as db:
             profile = db.query(Profile).first()
@@ -425,6 +464,9 @@ class MCPServerTest(unittest.IsolatedAsyncioTestCase):
             command=sys.executable,
             args=[str(backend_dir / "mcp_server.py")],
             cwd=backend_dir,
+            # The stdio client only forwards a minimal environment by default; without the
+            # test DATABASE_URL the subprocess would migrate the real backend/data/app.db.
+            env={**os.environ, "DATABASE_URL": os.environ["DATABASE_URL"]},
         )
         async with Client(params, raise_exceptions=True) as client:
             tools = await client.list_tools()

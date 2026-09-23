@@ -41,6 +41,8 @@ export interface Profile {
   summary: string
   raw_resume_text: string
   resume_file_path: string | null
+  /** False while the stored resume text hasn't been structured yet. */
+  resume_parsed: boolean
   skills: string[]
   experiences: Experience[]
   education: Education[]

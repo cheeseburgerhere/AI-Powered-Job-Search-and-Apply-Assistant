@@ -77,6 +77,9 @@ async def upload_resume(
     # Update or create profile
     profile = _get_or_create_profile(db)
     profile.raw_resume_text = text
+    # Without server AI the structured fields still describe the previous resume until
+    # the agent parses this text and saves it (save_profile_from_resume).
+    profile.resume_parsed = bool(parsed)
     if file:
         profile.resume_file_path = str(stored_path)
     if parsed:

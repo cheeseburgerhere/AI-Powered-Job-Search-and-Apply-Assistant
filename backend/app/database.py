@@ -44,14 +44,22 @@ _COLUMN_ADDITIONS = {
     "cover_letters": {
         "source": "VARCHAR NOT NULL DEFAULT ''",
     },
+    "profiles": {
+        "resume_parsed": "BOOLEAN NOT NULL DEFAULT 1",
+    },
 }
 
-# One-off backfills that run only in the migration that adds the column. Only the exact
-# default notes written by the agent tool and the manual-version route are trusted.
+# One-off backfills that run only in the migration that adds the column.
 _BACKFILLS = {
+    # Only the exact default notes written by the agent tool and the manual-version route are trusted.
     ("cover_letters", "source"): [
         "UPDATE cover_letters SET source = 'agent' WHERE feedback = 'Agent-authored draft'",
         "UPDATE cover_letters SET source = 'manual' WHERE feedback = 'Manual edit'",
+    ],
+    # Same rule the UI used before the flag existed: text without a parsed name is unparsed.
+    ("profiles", "resume_parsed"): [
+        "UPDATE profiles SET resume_parsed = 0 "
+        "WHERE COALESCE(full_name, '') = '' AND COALESCE(raw_resume_text, '') != ''",
     ],
 }
 
