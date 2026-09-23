@@ -259,6 +259,7 @@ def get_application_context(job_id: int, include_contact: bool = False) -> dict[
                     "content": letter.content,
                     "feedback": letter.feedback,
                     "status": letter.status,
+                    "source": letter.source,
                 }
                 for letter in letters
             ],
@@ -329,6 +330,7 @@ def save_cover_letter(
             "job_id": letter.job_id,
             "version": letter.version,
             "status": letter.status,
+            "source": letter.source,
             "feedback": letter.feedback,
             "content": letter.content,
         }

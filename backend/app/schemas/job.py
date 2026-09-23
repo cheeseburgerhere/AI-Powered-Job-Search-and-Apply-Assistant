@@ -14,6 +14,7 @@ class JobCreate(BaseModel):
     salary_max: Optional[int] = None
     status: Optional[str] = None
     cover_letter: Optional[str] = None
+    cover_letter_source: str = ""  # agent / server / manual when the caller knows
 
 
 class JobUpdate(BaseModel):
@@ -29,6 +30,7 @@ class JobUpdate(BaseModel):
     notes: Optional[str] = None
     next_follow_up: Optional[datetime] = None
     cover_letter: Optional[str] = None
+    cover_letter_source: Optional[str] = None
 
 
 class FitAnalysis(BaseModel):

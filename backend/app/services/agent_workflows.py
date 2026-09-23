@@ -238,6 +238,7 @@ def save_cover_letter_version(
         content=content.strip(),
         feedback=feedback.strip() or None,
         status=status,
+        source="agent",
     )
     db.add(letter)
     db.commit()

@@ -57,6 +57,7 @@ def generate_cover_letter(req: CoverLetterGenerate, db: Session = Depends(get_db
         version=existing_count + 1,
         content=content,
         status="draft",
+        source="server",
     )
     db.add(letter)
     db.commit()
@@ -120,6 +121,7 @@ def refine_cover_letter(letter_id: int, req: CoverLetterRefine, db: Session = De
         content=refined_content,
         feedback=req.feedback,
         status="draft",
+        source="server",
     )
     db.add(new_letter)
     db.commit()
@@ -165,6 +167,7 @@ def create_manual_cover_letter_version(letter_id: int, req: CoverLetterManualVer
         content=req.content,
         feedback=(req.feedback or "Manual edit"),
         status="draft",
+        source="manual",
     )
     db.add(new_letter)
     db.commit()

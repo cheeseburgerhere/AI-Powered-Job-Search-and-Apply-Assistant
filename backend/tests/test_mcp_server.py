@@ -2,6 +2,7 @@ import os
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -15,6 +16,7 @@ from sqlalchemy import inspect, text
 
 from app.database import Base, SessionLocal, create_tables, engine
 from app.main import app
+from app.models.cover_letter import CoverLetter
 from app.models.job import Job
 from app.models.profile import Profile
 from mcp_server import mcp
@@ -61,6 +63,68 @@ class MCPServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue({"category", "priority", "fit_analysis"}.issubset(columns))
         with engine.connect() as connection:
             self.assertEqual(connection.execute(text("SELECT title FROM jobs")).scalar_one(), "Senior Backend Engineer")
+
+    def test_letter_source_migration_trusts_only_default_notes(self):
+        with SessionLocal() as db:
+            job_id = db.query(Job).first().id
+            for version, feedback in enumerate(["Agent-authored draft", "Manual edit", "Shortened for recruiter"], 1):
+                db.add(CoverLetter(job_id=job_id, version=version, content="Dear team", feedback=feedback))
+            db.commit()
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE cover_letters DROP COLUMN source"))
+
+        create_tables()
+
+        with engine.connect() as connection:
+            rows = connection.execute(text("SELECT feedback, source FROM cover_letters ORDER BY version")).all()
+        self.assertEqual(
+            rows,
+            [("Agent-authored draft", "agent"), ("Manual edit", "manual"), ("Shortened for recruiter", "")],
+        )
+
+    def test_letter_source_recorded_per_creation_path(self):
+        with TestClient(app) as client:
+            created = client.post(
+                "/api/jobs",
+                json={
+                    "title": "Data Engineer",
+                    "company": "Example Labs",
+                    "description": "Pipelines.",
+                    "cover_letter": "Dear Example Labs,",
+                    "cover_letter_source": "server",
+                },
+            ).json()
+            letters = client.get("/api/cover-letters", params={"job_id": created["id"]}).json()
+            manual = client.post(
+                f"/api/cover-letters/{letters[0]['id']}/manual-version", json={"content": "Dear team,"}
+            ).json()
+            rejected = client.post(
+                "/api/jobs",
+                json={
+                    "title": "Rejected",
+                    "company": "Nowhere",
+                    "description": "x",
+                    "cover_letter": "Hi",
+                    "cover_letter_source": "robot",
+                },
+            )
+            titles = [job["title"] for job in client.get("/api/jobs").json()]
+
+        self.assertEqual(letters[0]["source"], "server")
+        self.assertEqual(manual["source"], "manual")
+        self.assertEqual(rejected.status_code, 400)
+        self.assertNotIn("Rejected", titles)
+
+    def test_nudges_lists_applied_jobs_past_follow_up(self):
+        with SessionLocal() as db:
+            job = db.query(Job).first()
+            job.status = "applied"
+            job.next_follow_up = datetime.now(timezone.utc) - timedelta(days=1)
+            db.commit()
+        with TestClient(app) as client:
+            response = client.get("/api/jobs/nudges")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([job["company"] for job in response.json()], ["Acme"])
 
     def test_resume_upload_stores_text_without_server_ai(self):
         with patch("app.routers.profile.server_ai_configured", return_value=False):
@@ -192,6 +256,7 @@ class MCPServerTest(unittest.IsolatedAsyncioTestCase):
                 {"job_id": job_id, "content": "Dear Acme,\n\nI build reliable Python services."},
             )
             self.assertEqual(letter.structured_content["version"], 1)
+            self.assertEqual(letter.structured_content["source"], "agent")
 
             updated = await client.call_tool("update_job_status", {"job_id": job_id, "status": "interested"})
             self.assertEqual(updated.structured_content["status"], "interested")

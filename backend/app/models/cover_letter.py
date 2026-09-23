@@ -3,6 +3,10 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
 
+# Who wrote a version: the MCP agent, the server's own AI, the user, or "" when unknown
+# (older rows, and text handed to the jobs API without saying where it came from).
+LETTER_SOURCES = {"", "agent", "server", "manual"}
+
 
 class CoverLetter(Base):
     __tablename__ = "cover_letters"
@@ -13,6 +17,7 @@ class CoverLetter(Base):
     content = Column(Text, default="")
     feedback = Column(Text, nullable=True)
     status = Column(String, default="draft")  # "draft", "ready"
+    source = Column(String, nullable=False, default="")  # see LETTER_SOURCES
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

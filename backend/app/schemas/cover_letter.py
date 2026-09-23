@@ -33,6 +33,7 @@ class CoverLetterResponse(BaseModel):
     content: str
     feedback: Optional[str] = None
     status: str
+    source: str = ""
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

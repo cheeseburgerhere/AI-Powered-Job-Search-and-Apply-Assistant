@@ -1,7 +1,10 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.models.cover_letter import LETTER_SOURCES
 from app.models.job import Job
 from app.models.tracker import TrackerEvent
 from app.schemas.job import JobCreate, JobUpdate, JobResponse, JobSearchRequest
@@ -19,6 +22,13 @@ from app.models.profile import Profile
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
 
+def _letter_source(value: str | None) -> str:
+    source = (value or "").strip().lower()
+    if source not in LETTER_SOURCES:
+        raise HTTPException(status_code=400, detail="cover_letter_source must be agent, server or manual")
+    return source
+
+
 @router.get("", response_model=list[JobResponse])
 def list_jobs(status: str | None = None, db: Session = Depends(get_db)):
     query = db.query(Job)
@@ -29,6 +39,7 @@ def list_jobs(status: str | None = None, db: Session = Depends(get_db)):
 
 @router.post("", response_model=JobResponse)
 def create_job(job_data: JobCreate, db: Session = Depends(get_db)):
+    letter_source = _letter_source(job_data.cover_letter_source)
     job = Job(
         title=job_data.title,
         company=job_data.company,
@@ -58,6 +69,7 @@ def create_job(job_data: JobCreate, db: Session = Depends(get_db)):
             version=1,
             content=job_data.cover_letter,
             status="draft",
+            source=letter_source,
         )
         db.add(letter)
         db.commit()
@@ -146,6 +158,7 @@ def update_job(job_id: int, update: JobUpdate, db: Session = Depends(get_db)):
     update_data = update.model_dump(exclude_unset=True)
 
     cover_letter_text = update_data.pop("cover_letter", None)
+    letter_source = _letter_source(update_data.pop("cover_letter_source", None))
     new_status = update_data.pop("status", None)
 
     for key, value in update_data.items():
@@ -172,6 +185,7 @@ def update_job(job_id: int, update: JobUpdate, db: Session = Depends(get_db)):
             version=next_version,
             content=cover_letter_text,
             status="draft",
+            source=letter_source,
         )
         db.add(letter)
 
