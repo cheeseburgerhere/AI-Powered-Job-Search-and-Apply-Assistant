@@ -22,9 +22,10 @@ export default function Profile() {
   useEffect(() => {
     refresh()
   }, [refresh])
-  // While the resume waits for the agent to parse it, watch for the structured profile to land.
+  // While the resume waits for the agent to parse it, or samples wait for a voice profile, watch for the result to land.
   useLiveRefresh(() => {
-    if (useProfileStore.getState().profile?.needs_parsing) refresh()
+    const current = useProfileStore.getState().profile
+    if (current?.needs_parsing || (current?.writing_samples?.length && !current.voice_profile)) refresh()
   }, 10000)
 
   if (!profile) {
@@ -429,11 +430,12 @@ function VoiceSection({ profile }: { profile: ProfileData }) {
             {busy === 'analyze' ? 'Analysing…' : profile.voice_profile ? 'Re-analyse voice' : 'Analyse my voice'}
           </Button>
         ) : (
-          <span className="text-xs text-ink-faint">
-            Voice analysis needs server AI. Samples are saved, but the agent tools don't read them yet.
-          </span>
+          samples.length === 0 && <span className="text-xs text-ink-faint">Your agent describes your voice from these.</span>
         )}
       </div>
+      {!serverAi && samples.length > 0 && (
+        <AgentHint prompt="Read my writing samples, describe my writing voice, and save it to my profile." />
+      )}
     </section>
   )
 }

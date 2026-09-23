@@ -85,5 +85,5 @@ Delete this file when the `redesign/ledger-ui` branch merges.
 - Search results merge into the saved jobs list instead of replacing it in the store.
 - Cover letters carry `source` (agent / server / manual / unknown). Editing someone else's
   version always saves a new manual version, so agent drafts stay in the history.
-- Voice analysis stays server-AI only: the MCP tools can't save a voice profile and don't
-  return writing samples, so there is no agent path for it yet.
+- Without server AI, Writing voice shows an agent prompt once samples exist. The agent reads them
+  with `get_writing_samples` (contact details masked) and saves the result with `save_voice_profile`.

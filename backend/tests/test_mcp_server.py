@@ -19,7 +19,7 @@ from app.main import app
 from app.models.cover_letter import CoverLetter
 from app.models.job import Job
 from app.models.profile import Profile
-from mcp_server import mcp
+from mcp_server import READ_ONLY, SAFE_WRITE, mcp
 
 
 class MCPServerTest(unittest.IsolatedAsyncioTestCase):
@@ -261,6 +261,58 @@ class MCPServerTest(unittest.IsolatedAsyncioTestCase):
             updated = await client.call_tool("update_job_status", {"job_id": job_id, "status": "interested"})
             self.assertEqual(updated.structured_content["status"], "interested")
 
+    async def test_agent_derives_voice_profile_from_writing_samples(self):
+        samples = [
+            "Hi Sam,\n\nShort version: the migration shipped. Reach me at ada@example.test or +1 (555) 010-0200.",
+            "I like small, boring releases.",
+        ]
+        with SessionLocal() as db:
+            profile = db.query(Profile).first()
+            profile.phone = "+1 555 010 0200"
+            profile.writing_samples = samples
+            db.commit()
+            job_id = db.query(Job).first().id
+
+        async with Client(mcp, raise_exceptions=True) as client:
+            tools = {tool.name: tool for tool in (await client.list_tools()).tools}
+            self.assertEqual(tools["get_writing_samples"].annotations, READ_ONLY)
+            self.assertEqual(tools["save_voice_profile"].annotations, SAFE_WRITE)
+
+            context = await client.call_tool("get_application_context", {"job_id": job_id})
+            self.assertEqual(context.structured_content["profile"]["voice_profile"], "")
+            self.assertEqual(context.structured_content["profile"]["writing_sample_count"], 2)
+            self.assertNotIn("writing_samples", context.structured_content["profile"])
+
+            masked = await client.call_tool("get_writing_samples", {})
+            self.assertEqual(masked.structured_content["count"], 2)
+            self.assertEqual(
+                masked.structured_content["samples"][0],
+                "Hi Sam,\n\nShort version: the migration shipped. Reach me at [email] or [phone].",
+            )
+            self.assertEqual(masked.structured_content["samples"][1], samples[1])
+            raw = await client.call_tool("get_writing_samples", {"include_contact": True})
+            self.assertEqual(raw.structured_content["samples"], samples)
+
+            voice = "Direct and warm. Short sentences, plain words, dry humour."
+            saved = await client.call_tool("save_voice_profile", {"voice_profile": f"  {voice}\n"})
+            self.assertEqual(saved.structured_content["voice_profile"], voice)
+            self.assertEqual(saved.structured_content["writing_sample_count"], 2)
+
+            empty = await client.call_tool("save_voice_profile", {"voice_profile": "   "})
+            self.assertTrue(empty.is_error)
+            self.assertIn("empty", empty.content[0].text)
+            too_long = await client.call_tool("save_voice_profile", {"voice_profile": "x" * 2001})
+            self.assertTrue(too_long.is_error)
+            self.assertIn("2000 characters", too_long.content[0].text)
+
+            context = await client.call_tool("get_application_context", {"job_id": job_id})
+            self.assertEqual(context.structured_content["profile"]["voice_profile"], voice)
+
+        with TestClient(app) as http:
+            ui_profile = http.get("/api/profile").json()
+        self.assertEqual(ui_profile["voice_profile"], voice)
+        self.assertEqual(ui_profile["writing_samples"], samples)
+
     async def test_stdio_entrypoint_lists_expected_tools(self):
         backend_dir = Path(__file__).resolve().parents[1]
         params = StdioServerParameters(
@@ -278,6 +330,8 @@ class MCPServerTest(unittest.IsolatedAsyncioTestCase):
                     "save_profile_from_resume",
                     "record_job_analysis",
                     "save_cover_letter",
+                    "get_writing_samples",
+                    "save_voice_profile",
                 }.issubset(names)
             )
 
