@@ -2,6 +2,8 @@
 
 import os
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -12,6 +14,7 @@ os.chdir(Path(__file__).resolve().parent)
 from mcp.server import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
+from pydantic import ValidationError
 
 from app.database import SessionLocal, create_tables
 from app.models.cover_letter import CoverLetter
@@ -20,6 +23,7 @@ from app.models.profile import Profile
 from app.schemas.job import JobSearchRequest
 from app.schemas.profile import ProfileUpdate
 from app.services.agent_workflows import (
+    SearchProviderError,
     record_job_analysis as persist_job_analysis,
     save_cover_letter_version,
     search_and_persist_jobs,
@@ -41,8 +45,23 @@ SAFE_WRITE = ToolAnnotations(
     open_world_hint=False,
 )
 
+# Failures the workflow layer and schemas raise on purpose, matched by exact type: subclasses
+# such as KeyError or JSONDecodeError mean a bug and stay hidden from the agent as crashes.
+_ANTICIPATED_ERRORS = (LookupError, ValueError, SearchProviderError, ValidationError)
+
 create_tables()
 mcp = MCPServer("AI Job Assistant", instructions=INSTRUCTIONS)
+
+
+@contextmanager
+def _agent_errors() -> Iterator[None]:
+    """Pass anticipated failures to the agent as ToolErrors; the SDK hides any other exception's message."""
+    try:
+        yield
+    except _ANTICIPATED_ERRORS as exc:
+        if type(exc) not in _ANTICIPATED_ERRORS:
+            raise
+        raise ToolError(str(exc)) from exc
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -92,7 +111,7 @@ def get_profile_context(include_contact: bool = False, include_resume_text: bool
     with SessionLocal() as db:
         profile = db.query(Profile).first()
         if not profile:
-            raise LookupError("Profile not found. Complete onboarding in the web UI first.")
+            raise ToolError("Profile not found. Complete onboarding in the web UI first.")
         result = {
             "full_name": profile.full_name,
             "location": profile.location,
@@ -126,17 +145,18 @@ def save_profile_from_resume(
     certifications: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Save the harness model's structured resume analysis into the profile displayed by the UI."""
-    update = ProfileUpdate(
-        full_name=full_name,
-        email=email,
-        phone=phone,
-        location=location,
-        summary=summary,
-        skills=skills,
-        experiences=experiences,
-        education=education,
-        certifications=certifications or [],
-    )
+    with _agent_errors():
+        update = ProfileUpdate(
+            full_name=full_name,
+            email=email,
+            phone=phone,
+            location=location,
+            summary=summary,
+            skills=skills,
+            experiences=experiences,
+            education=education,
+            certifications=certifications or [],
+        )
     with SessionLocal() as db:
         profile = db.query(Profile).first()
         if profile is None:
@@ -220,21 +240,23 @@ def search_and_save_jobs(
 ) -> dict[str, Any]:
     """Search configured providers and save results; direct ATS sources require company_slugs and no LLM is called."""
     searched_sources = sources or JobSearchService().configured_sources()
-    request = JobSearchRequest(
-        query=query,
-        location=location or None,
-        remote_only=remote_only,
-        salary_min=salary_min,
-        salary_max=salary_max,
-        sources=sources,
-        country=country or None,
-        scrape_sites=scrape_sites,
-        company_slugs=company_slugs,
-        score_results=False,
-        per_page=max(1, min(limit, 100)),
-    )
+    with _agent_errors():
+        request = JobSearchRequest(
+            query=query,
+            location=location or None,
+            remote_only=remote_only,
+            salary_min=salary_min,
+            salary_max=salary_max,
+            sources=sources,
+            country=country or None,
+            scrape_sites=scrape_sites,
+            company_slugs=company_slugs,
+            score_results=False,
+            per_page=max(1, min(limit, 100)),
+        )
     with SessionLocal() as db:
-        jobs, warnings = search_and_persist_jobs(db, request, allow_server_ai=False)
+        with _agent_errors():
+            jobs, warnings = search_and_persist_jobs(db, request, allow_server_ai=False)
         if (
             not jobs
             and not warnings
@@ -282,9 +304,9 @@ def get_application_context(job_id: int, include_contact: bool = False) -> dict[
         job = db.query(Job).filter(Job.id == job_id).first()
         profile = db.query(Profile).first()
         if not job:
-            raise LookupError("Job not found")
+            raise ToolError("Job not found")
         if not profile:
-            raise LookupError("Profile not found. Complete onboarding in the web UI first.")
+            raise ToolError("Profile not found. Complete onboarding in the web UI first.")
         letters = (
             db.query(CoverLetter)
             .filter(CoverLetter.job_id == job_id)
@@ -336,16 +358,17 @@ def record_job_analysis(
 ) -> dict[str, Any]:
     """Persist the harness model's evidence-backed classification and 0-10 fit score for a job."""
     with SessionLocal() as db:
-        job = persist_job_analysis(
-            db,
-            job_id,
-            fit_score=fit_score,
-            category=category,
-            priority=priority,
-            match_reasons=match_reasons,
-            gaps=gaps,
-            summary=summary,
-        )
+        with _agent_errors():
+            job = persist_job_analysis(
+                db,
+                job_id,
+                fit_score=fit_score,
+                category=category,
+                priority=priority,
+                match_reasons=match_reasons,
+                gaps=gaps,
+                summary=summary,
+            )
         return _job_dict(job)
 
 
@@ -355,8 +378,9 @@ def update_job_status(job_id: int, status: str, notes: str = "") -> dict[str, An
     with SessionLocal() as db:
         job = db.query(Job).filter(Job.id == job_id).first()
         if not job:
-            raise LookupError("Job not found")
-        set_job_status(db, job, status)
+            raise ToolError("Job not found")
+        with _agent_errors():
+            set_job_status(db, job, status)
         if notes:
             job.notes = notes.strip()
         db.commit()
@@ -381,7 +405,8 @@ def save_cover_letter(
 ) -> dict[str, Any]:
     """Save harness-generated text as a new cover-letter version visible in the UI."""
     with SessionLocal() as db:
-        letter = save_cover_letter_version(db, job_id, content, feedback=feedback, status=status)
+        with _agent_errors():
+            letter = save_cover_letter_version(db, job_id, content, feedback=feedback, status=status)
         return {
             "id": letter.id,
             "job_id": letter.job_id,

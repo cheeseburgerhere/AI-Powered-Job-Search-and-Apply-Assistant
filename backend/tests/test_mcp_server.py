@@ -313,6 +313,77 @@ class MCPServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ui_profile["voice_profile"], voice)
         self.assertEqual(ui_profile["writing_samples"], samples)
 
+    async def test_anticipated_tool_errors_reach_the_agent(self):
+        with SessionLocal() as db:
+            job_id = db.query(Job).first().id
+        provider_failure = {"jobs": [], "errors": ["jsearch: HTTP 401: invalid key"]}
+
+        async with Client(mcp, raise_exceptions=True) as client:
+
+            async def error_text(tool, arguments):
+                result = await client.call_tool(tool, arguments)
+                self.assertTrue(result.is_error, tool)
+                return result.content[0].text
+
+            self.assertIn(
+                "status must be one of: applied, discovered, follow_up, interested, interview, offer, rejected",
+                await error_text("update_job_status", {"job_id": job_id, "status": "ghosted"}),
+            )
+            self.assertIn("Job not found", await error_text("update_job_status", {"job_id": 999, "status": "applied"}))
+            self.assertIn("Job not found", await error_text("get_application_context", {"job_id": 999}))
+            self.assertIn(
+                "fit_score must be between 0 and 10",
+                await error_text(
+                    "record_job_analysis",
+                    {
+                        "job_id": job_id,
+                        "fit_score": 11,
+                        "category": "backend",
+                        "priority": "high",
+                        "match_reasons": [],
+                        "gaps": [],
+                        "summary": "",
+                    },
+                ),
+            )
+            self.assertIn("Job not found", await error_text("save_cover_letter", {"job_id": 999, "content": "Hi"}))
+            self.assertIn(
+                "Cover letter content cannot be empty",
+                await error_text("save_cover_letter", {"job_id": job_id, "content": "  "}),
+            )
+            with patch("app.services.agent_workflows.JobSearchService.search_jobs", return_value=provider_failure):
+                self.assertIn(
+                    "jsearch: HTTP 401: invalid key",
+                    await error_text("search_and_save_jobs", {"query": "Python", "sources": ["jsearch"]}),
+                )
+            self.assertIn(
+                "experiences.0.bullets",
+                await error_text(
+                    "save_profile_from_resume",
+                    {
+                        "full_name": "Ada Candidate",
+                        "email": "",
+                        "phone": "",
+                        "location": "",
+                        "summary": "",
+                        "skills": [],
+                        "experiences": [{"company": "Example", "bullets": "Built APIs"}],
+                        "education": [],
+                    },
+                ),
+            )
+
+            # A LookupError subclass from a bug is a crash: its text stays in the server log.
+            with patch("mcp_server.set_job_status", side_effect=KeyError("internal detail")):
+                with self.assertLogs(level="ERROR"):
+                    crashed = await error_text("update_job_status", {"job_id": job_id, "status": "applied"})
+            self.assertEqual(crashed, "Error executing tool update_job_status")
+
+            with SessionLocal() as db:
+                db.query(Profile).delete()
+                db.commit()
+            self.assertIn("Profile not found", await error_text("get_profile_context", {}))
+
     async def test_stdio_entrypoint_lists_expected_tools(self):
         backend_dir = Path(__file__).resolve().parents[1]
         params = StdioServerParameters(
