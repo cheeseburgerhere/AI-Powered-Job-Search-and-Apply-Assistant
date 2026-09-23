@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 from typing import Optional
 from datetime import datetime
 
@@ -82,3 +82,9 @@ class ProfileResponse(ProfileBase):
     updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+
+    @computed_field
+    @property
+    def needs_parsing(self) -> bool:
+        """Resume text is stored but nobody has structured it into a profile yet."""
+        return bool((self.raw_resume_text or "").strip()) and not (self.full_name or "").strip()

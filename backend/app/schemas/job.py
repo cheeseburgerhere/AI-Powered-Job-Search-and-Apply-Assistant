@@ -31,6 +31,12 @@ class JobUpdate(BaseModel):
     cover_letter: Optional[str] = None
 
 
+class FitAnalysis(BaseModel):
+    reasons: list[str] = []
+    gaps: list[str] = []
+    summary: str = ""
+
+
 class JobResponse(BaseModel):
     id: int
     external_id: Optional[str] = None
@@ -45,6 +51,7 @@ class JobResponse(BaseModel):
     url: Optional[str] = None
     fit_score: Optional[float] = None
     fit_reasoning: Optional[str] = None
+    fit_analysis: Optional[FitAnalysis] = None
     category: str = ""
     priority: str = ""
     status: str

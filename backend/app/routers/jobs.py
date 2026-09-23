@@ -8,7 +8,12 @@ from app.schemas.job import JobCreate, JobUpdate, JobResponse, JobSearchRequest
 from app.services.resume_parser import profile_to_text
 from app.services.ai_service import get_ai_service
 from app.services.job_search import JobSearchService
-from app.services.agent_workflows import SearchProviderError, search_and_persist_jobs, set_job_status
+from app.services.agent_workflows import (
+    SearchProviderError,
+    apply_fit_result,
+    search_and_persist_jobs,
+    set_job_status,
+)
 from app.models.profile import Profile
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
@@ -197,14 +202,7 @@ def score_job(job_id: int, db: Session = Depends(get_db)):
 
     profile_text = profile_to_text(profile)
     ai = get_ai_service()
-    result = ai.score_fit(profile_text, job.description)
-
-    job.fit_score = result.get("score", 0)
-    job.fit_reasoning = (
-        f"Match reasons: {', '.join(result.get('top_reasons', []))}\n"
-        f"Gaps: {', '.join(result.get('gaps', []))}\n"
-        f"{result.get('summary', '')}"
-    )
+    apply_fit_result(job, ai.score_fit(profile_text, job.description))
     db.commit()
     db.refresh(job)
     return job

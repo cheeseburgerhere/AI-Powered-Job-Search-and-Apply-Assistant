@@ -53,16 +53,17 @@ class MCPServerTest(unittest.IsolatedAsyncioTestCase):
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE jobs DROP COLUMN category"))
             connection.execute(text("ALTER TABLE jobs DROP COLUMN priority"))
+            connection.execute(text("ALTER TABLE jobs DROP COLUMN fit_analysis"))
 
         create_tables()
 
         columns = {column["name"] for column in inspect(engine).get_columns("jobs")}
-        self.assertTrue({"category", "priority"}.issubset(columns))
+        self.assertTrue({"category", "priority", "fit_analysis"}.issubset(columns))
         with engine.connect() as connection:
             self.assertEqual(connection.execute(text("SELECT title FROM jobs")).scalar_one(), "Senior Backend Engineer")
 
     def test_resume_upload_stores_text_without_server_ai(self):
-        with patch("app.routers.profile.is_real_secret", return_value=False):
+        with patch("app.routers.profile.server_ai_configured", return_value=False):
             with TestClient(app) as client:
                 response = client.post(
                     "/api/profile/upload-resume",
@@ -70,6 +71,22 @@ class MCPServerTest(unittest.IsolatedAsyncioTestCase):
                 )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["raw_resume_text"], "Ada Candidate\nBackend engineer")
+
+    def test_profile_reports_resume_waiting_for_agent_parse(self):
+        with SessionLocal() as db:
+            profile = db.query(Profile).first()
+            profile.full_name = ""
+            profile.raw_resume_text = "Ada Candidate\nBackend engineer"
+            db.commit()
+        with TestClient(app) as client:
+            self.assertTrue(client.get("/api/profile").json()["needs_parsing"])
+
+    def test_capabilities_reports_server_ai_and_sources(self):
+        with patch("app.services.capabilities.is_real_secret", return_value=False):
+            with TestClient(app) as client:
+                body = client.get("/api/meta/capabilities").json()
+        self.assertFalse(body["server_ai"])
+        self.assertIn("greenhouse", body["search_sources"])
 
     async def test_agent_workflow_tools_share_ui_data(self):
         async with Client(mcp, raise_exceptions=True) as client:
@@ -143,6 +160,17 @@ class MCPServerTest(unittest.IsolatedAsyncioTestCase):
                 },
             )
             self.assertEqual(analyzed.structured_content["category"], "backend")
+            self.assertEqual(
+                analyzed.structured_content["fit_analysis"],
+                {
+                    "reasons": ["Python experience"],
+                    "gaps": ["No stated cloud experience"],
+                    "summary": "Strong evidence-backed match.",
+                },
+            )
+            with TestClient(app) as http:
+                ui_job = http.get(f"/api/jobs/{job_id}").json()
+            self.assertEqual(ui_job["fit_analysis"]["gaps"], ["No stated cloud experience"])
 
             letter = await client.call_tool(
                 "save_cover_letter",

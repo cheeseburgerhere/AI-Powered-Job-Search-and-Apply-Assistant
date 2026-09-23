@@ -20,6 +20,7 @@ class Job(Base):
     url = Column(String, nullable=True)
     fit_score = Column(Float, nullable=True)
     fit_reasoning = Column(Text, nullable=True)
+    fit_analysis = Column(JSON, nullable=True)  # {"reasons": [], "gaps": [], "summary": ""}
     category = Column(String, nullable=False, default="")
     priority = Column(String, nullable=False, default="")
     status = Column(String, default="interested")

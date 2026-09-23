@@ -37,6 +37,16 @@ def _format_fit_reasoning(result: dict) -> str:
     ).strip()
 
 
+def apply_fit_result(job: Job, result: dict) -> None:
+    """Store a fit result as structured analysis plus the legacy reasoning text."""
+    reasons = [str(item).strip() for item in (result.get("top_reasons") or []) if str(item).strip()]
+    gaps = [str(item).strip() for item in (result.get("gaps") or []) if str(item).strip()]
+    summary = str(result.get("summary") or "").strip()
+    job.fit_score = float(result.get("score", 0))
+    job.fit_analysis = {"reasons": reasons, "gaps": gaps, "summary": summary}
+    job.fit_reasoning = _format_fit_reasoning({"top_reasons": reasons, "gaps": gaps, "summary": summary})
+
+
 def _find_existing_job(db: Session, item: dict) -> Job | None:
     source = (item.get("source") or "").strip() or "unknown"
     external_id = item.get("external_id")
@@ -135,9 +145,7 @@ def search_and_persist_jobs(
 
         if ai and scored_count < max(0, request.max_scored_jobs) and (job.description or "").strip():
             try:
-                score_result = ai.score_fit(profile_text, job.description)
-                job.fit_score = float(score_result.get("score", 0))
-                job.fit_reasoning = _format_fit_reasoning(score_result)
+                apply_fit_result(job, ai.score_fit(profile_text, job.description))
                 scored_count += 1
             except Exception as exc:
                 if not job.fit_reasoning:
@@ -178,12 +186,9 @@ def record_job_analysis(
     if normalized_priority not in ALLOWED_PRIORITIES:
         raise ValueError("priority must be low, medium, high, or top")
 
-    job.fit_score = fit_score
+    apply_fit_result(job, {"score": fit_score, "top_reasons": match_reasons, "gaps": gaps, "summary": summary})
     job.category = category.strip()
     job.priority = normalized_priority
-    job.fit_reasoning = _format_fit_reasoning(
-        {"top_reasons": match_reasons, "gaps": gaps, "summary": summary.strip()}
-    )
     db.commit()
     db.refresh(job)
     return job

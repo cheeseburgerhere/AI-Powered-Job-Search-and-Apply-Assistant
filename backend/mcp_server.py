@@ -61,6 +61,7 @@ def _job_dict(job: Job, *, full_description: bool = False) -> dict[str, Any]:
         "source": job.source,
         "fit_score": job.fit_score,
         "fit_reasoning": job.fit_reasoning,
+        "fit_analysis": job.fit_analysis,
         "category": job.category or "",
         "priority": job.priority or "",
         "status": job.status,

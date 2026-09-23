@@ -44,6 +44,7 @@ def _add_missing_job_columns():
     additions = {
         "category": "VARCHAR NOT NULL DEFAULT ''",
         "priority": "VARCHAR NOT NULL DEFAULT ''",
+        "fit_analysis": "JSON",
     }
     with engine.begin() as connection:
         for name, definition in additions.items():

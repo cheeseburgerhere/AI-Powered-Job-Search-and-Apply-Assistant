@@ -11,6 +11,7 @@ from app.models.job_board import JobBoard
 from app.models.profile import Profile
 from app.schemas.job import JobResponse
 from app.schemas.job_board import JobBoardCreate, JobBoardResponse, JobBoardRunResponse, JobBoardUpdate
+from app.services.agent_workflows import apply_fit_result
 from app.services.ai_service import get_ai_service
 from app.services.job_search import JobSearchService
 from app.services.resume_parser import profile_to_text
@@ -31,17 +32,6 @@ def _normalize_domain(raw: str) -> str:
     if domain.startswith("www."):
         domain = domain[4:]
     return domain
-
-
-def _format_fit_reasoning(result: dict) -> str:
-    top_reasons = result.get("top_reasons", []) or []
-    gaps = result.get("gaps", []) or []
-    summary = result.get("summary", "") or ""
-    return (
-        f"Match reasons: {', '.join(top_reasons)}\n"
-        f"Gaps: {', '.join(gaps)}\n"
-        f"{summary}"
-    )
 
 
 def _find_existing_discovery_job(
@@ -238,9 +228,7 @@ def run_board(board_id: int, per_page: int = 30, db: Session = Depends(get_db)):
 
         if ai and scored_count < max_scored and (job.description or "").strip():
             try:
-                score_result = ai.score_fit(profile_text, job.description)
-                job.fit_score = float(score_result.get("score", 0))
-                job.fit_reasoning = _format_fit_reasoning(score_result)
+                apply_fit_result(job, ai.score_fit(profile_text, job.description))
                 scored_count += 1
             except Exception as exc:
                 if not job.fit_reasoning:
