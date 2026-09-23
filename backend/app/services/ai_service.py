@@ -8,6 +8,10 @@ import anthropic
 from app.config import get_settings
 
 
+class AIProviderError(RuntimeError):
+    """The configured AI provider could not produce a response (bad key, unreachable, empty reply)."""
+
+
 class AIService:
     """Provider-agnostic AI service for Anthropic, Gemini, and Qwen."""
 
@@ -152,11 +156,14 @@ class AIService:
     ) -> str:
         target_model = model or self._default_model(speed=speed)
 
-        if self.provider == "anthropic":
-            return self._call_anthropic(system, user, target_model, max_tokens)
-        if self.provider == "gemini":
-            return self._call_gemini(system, user, target_model, max_tokens)
-        return self._call_qwen(system, user, target_model, max_tokens)
+        try:
+            if self.provider == "anthropic":
+                return self._call_anthropic(system, user, target_model, max_tokens)
+            if self.provider == "gemini":
+                return self._call_gemini(system, user, target_model, max_tokens)
+            return self._call_qwen(system, user, target_model, max_tokens)
+        except Exception as exc:
+            raise AIProviderError(f"{self.provider} request failed: {exc}") from exc
 
     def _extract_json_text(self, raw_text: str) -> str:
         text = raw_text.strip()

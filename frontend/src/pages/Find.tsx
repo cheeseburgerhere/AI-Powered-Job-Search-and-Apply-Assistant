@@ -405,7 +405,10 @@ function ProviderStatus({ configured }: { configured: Set<string> }) {
             const check = checks?.[id]
             const isOn = configured.has(id)
             let state = !info.env ? 'No key needed' : isOn ? 'Configured' : 'No key'
-            if (check?.status === 'ok') state = `OK · ${check.sample_count} sample`
+            // Company-board sources can't be sampled without company slugs, so only keyed ones report counts.
+            if (check?.status === 'ok' && info.env) {
+              state = `OK · ${check.sample_count} ${check.sample_count === 1 ? 'result' : 'results'}`
+            }
             if (check?.status === 'error') state = 'Error'
             return (
               <tr key={id} className="border-b border-rule last:border-0">

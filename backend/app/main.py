@@ -1,8 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import create_tables
 from app.routers import profile, jobs, cover_letters, tracker, job_boards, apply, meta
 from app.config import get_settings
+from app.services.ai_service import AIProviderError
 
 app = FastAPI(title="AI Job Assistant", version="0.1.0")
 
@@ -21,6 +23,12 @@ app.include_router(cover_letters.router)
 app.include_router(tracker.router)
 app.include_router(apply.router)
 app.include_router(meta.router)
+
+
+@app.exception_handler(AIProviderError)
+def ai_provider_error(_: Request, exc: AIProviderError):
+    # A provider failure is upstream, not a bug here; give the UI a message it can show.
+    return JSONResponse(status_code=502, content={"detail": str(exc)})
 
 
 @app.on_event("startup")

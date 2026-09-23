@@ -134,6 +134,22 @@ class MCPServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(invalid.status_code, 400)
         self.assertNotIn("Bad", titles)
 
+    def test_ai_provider_failure_returns_readable_502(self):
+        with SessionLocal() as db:
+            job_id = db.query(Job).first().id
+        with (
+            patch("app.services.ai_service.AIService._call_anthropic", side_effect=RuntimeError("Connection error.")),
+            patch("app.services.ai_service.AIService._call_gemini", side_effect=RuntimeError("Connection error.")),
+            patch("app.services.ai_service.AIService._call_qwen", side_effect=RuntimeError("Connection error.")),
+        ):
+            with TestClient(app) as client:
+                response = client.post(f"/api/jobs/{job_id}/score")
+                job = client.get(f"/api/jobs/{job_id}").json()
+
+        self.assertEqual(response.status_code, 502)
+        self.assertIn("request failed: Connection error.", response.json()["detail"])
+        self.assertIsNone(job["fit_score"])
+
     def test_timestamps_round_trip_as_utc(self):
         istanbul = timezone(timedelta(hours=3))
         with SessionLocal() as db:
