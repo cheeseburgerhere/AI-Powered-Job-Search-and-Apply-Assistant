@@ -32,7 +32,7 @@ export function StatusMark({ status, className }: { status: string; className?: 
     <span className={cn('inline-flex items-center gap-1.5 text-[13px] text-ink-muted', className)}>
       <span
         aria-hidden
-        className="size-1.5 rounded-full"
+        className="size-1.5 shrink-0 rounded-full"
         style={{ backgroundColor: `var(--color-status-${status}, var(--color-ink-faint))` }}
       />
       {statusLabel(status)}

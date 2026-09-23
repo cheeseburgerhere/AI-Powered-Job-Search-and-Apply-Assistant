@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import api from '../api/client'
+import api, { errorDetail } from '../api/client'
 
 export interface Experience {
   company: string
@@ -48,6 +48,8 @@ export interface Profile {
   writing_samples: string[]
   voice_profile: string
   preferences: Preferences
+  /** Resume text is stored but not yet structured (no server AI; the agent should parse it). */
+  needs_parsing: boolean
   created_at: string | null
   updated_at: string | null
 }
@@ -93,8 +95,8 @@ export const useProfileStore = create<ProfileState>((set) => ({
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       set({ profile: data, loading: false })
-    } catch (err: any) {
-      set({ error: err.response?.data?.detail || 'Upload failed', loading: false })
+    } catch (err) {
+      set({ error: errorDetail(err, 'Upload failed'), loading: false })
     }
   },
 
@@ -103,8 +105,8 @@ export const useProfileStore = create<ProfileState>((set) => ({
     try {
       const { data } = await api.put('/profile', updates)
       set({ profile: data, loading: false })
-    } catch (err: any) {
-      set({ error: err.response?.data?.detail || 'Update failed', loading: false })
+    } catch (err) {
+      set({ error: errorDetail(err, 'Update failed'), loading: false })
     }
   },
 
@@ -113,8 +115,8 @@ export const useProfileStore = create<ProfileState>((set) => ({
     try {
       const { data } = await api.put('/profile/preferences', prefs)
       set({ profile: data, loading: false })
-    } catch (err: any) {
-      set({ error: err.response?.data?.detail || 'Update failed', loading: false })
+    } catch (err) {
+      set({ error: errorDetail(err, 'Update failed'), loading: false })
     }
   },
 
@@ -123,8 +125,8 @@ export const useProfileStore = create<ProfileState>((set) => ({
     try {
       const { data } = await api.post('/profile/writing-sample', { text })
       set({ profile: data, loading: false })
-    } catch (err: any) {
-      set({ error: err.response?.data?.detail || 'Failed to add sample', loading: false })
+    } catch (err) {
+      set({ error: errorDetail(err, 'Failed to add sample'), loading: false })
     }
   },
 
@@ -133,8 +135,8 @@ export const useProfileStore = create<ProfileState>((set) => ({
     try {
       const { data } = await api.post('/profile/analyze-voice')
       set({ profile: data, loading: false })
-    } catch (err: any) {
-      set({ error: err.response?.data?.detail || 'Analysis failed', loading: false })
+    } catch (err) {
+      set({ error: errorDetail(err, 'Analysis failed'), loading: false })
     }
   },
 }))

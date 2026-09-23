@@ -81,6 +81,21 @@ class MCPServerTest(unittest.IsolatedAsyncioTestCase):
         with TestClient(app) as client:
             self.assertTrue(client.get("/api/profile").json()["needs_parsing"])
 
+    def test_tracker_events_feed_spans_jobs_newest_first(self):
+        with TestClient(app) as client:
+            created = client.post(
+                "/api/jobs",
+                json={"title": "Platform Engineer", "company": "Example Labs", "description": "Go services."},
+            ).json()
+            client.put(f"/api/jobs/{created['id']}", json={"status": "applied"})
+            feed = client.get("/api/tracker/events", params={"limit": 5}).json()
+            history = client.get("/api/tracker/events", params={"job_id": created["id"]}).json()
+
+        self.assertEqual(feed[0]["to_status"], "applied")
+        self.assertEqual(feed[0]["job_title"], "Platform Engineer")
+        self.assertEqual(feed[0]["job_company"], "Example Labs")
+        self.assertEqual([event["to_status"] for event in history], ["interested", "applied"])
+
     def test_capabilities_reports_server_ai_and_sources(self):
         with patch("app.services.capabilities.is_real_secret", return_value=False):
             with TestClient(app) as client:

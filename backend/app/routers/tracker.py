@@ -31,14 +31,23 @@ def get_board(db: Session = Depends(get_db)):
 
 
 @router.get("/events", response_model=list[TrackerEventResponse])
-def get_events(job_id: int, db: Session = Depends(get_db)):
+def get_events(job_id: int | None = None, limit: int = 50, db: Session = Depends(get_db)):
+    """One job's history (oldest first), or the most recent events across all jobs."""
+    query = db.query(TrackerEvent)
+    if job_id is not None:
+        return query.filter(TrackerEvent.job_id == job_id).order_by(TrackerEvent.created_at.asc()).all()
     events = (
-        db.query(TrackerEvent)
-        .filter(TrackerEvent.job_id == job_id)
-        .order_by(TrackerEvent.created_at.asc())
+        query.order_by(TrackerEvent.created_at.desc(), TrackerEvent.id.desc())
+        .limit(max(1, min(limit, 200)))
         .all()
     )
-    return events
+    feed = []
+    for event in events:
+        item = TrackerEventResponse.model_validate(event)
+        if event.job:
+            item = item.model_copy(update={"job_title": event.job.title, "job_company": event.job.company})
+        feed.append(item)
+    return feed
 
 
 @router.get("/stats", response_model=TrackerStatsResponse)

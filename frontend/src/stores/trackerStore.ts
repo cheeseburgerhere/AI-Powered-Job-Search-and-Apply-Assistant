@@ -11,7 +11,7 @@ interface TrackerBoard {
   rejected: Job[]
 }
 
-interface TrackerStats {
+export interface TrackerStats {
   total: number
   discovered: number
   interested: number
@@ -29,25 +29,29 @@ interface RejectedBin {
   jobs: Job[]
 }
 
-interface TrackerEvent {
+export interface TrackerEvent {
   id: number
   job_id: number
   from_status: string
   to_status: string
   note: string | null
   created_at: string | null
+  job_title: string
+  job_company: string
 }
 
 interface TrackerState {
   board: TrackerBoard
   stats: TrackerStats
   events: TrackerEvent[]
+  activity: TrackerEvent[]
   rejectedBins: RejectedBin[]
   loading: boolean
 
   fetchBoard: () => Promise<void>
   fetchStats: () => Promise<void>
   fetchEvents: (jobId: number) => Promise<void>
+  fetchActivity: (limit?: number) => Promise<void>
   fetchRejectedBins: () => Promise<void>
 }
 
@@ -75,6 +79,7 @@ export const useTrackerStore = create<TrackerState>((set) => ({
   board: emptyBoard,
   stats: emptyStats,
   events: [],
+  activity: [],
   rejectedBins: [],
   loading: false,
 
@@ -101,6 +106,15 @@ export const useTrackerStore = create<TrackerState>((set) => ({
     try {
       const { data } = await api.get('/tracker/events', { params: { job_id: jobId } })
       set({ events: data })
+    } catch {
+      // silent
+    }
+  },
+
+  fetchActivity: async (limit = 30) => {
+    try {
+      const { data } = await api.get('/tracker/events', { params: { limit } })
+      set({ activity: data })
     } catch {
       // silent
     }

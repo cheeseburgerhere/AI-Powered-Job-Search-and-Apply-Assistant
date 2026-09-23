@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Layout from './components/Layout'
-import Dashboard from './pages/Dashboard'
+import Today from './pages/Today'
 import Onboarding from './pages/Onboarding'
 import JobsList from './pages/JobsList'
 import Find from './pages/Find'
@@ -19,7 +19,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route element={<Layout />}>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={<Today />} />
           <Route path="/jobs" element={<JobsList />} />
           <Route path="/find" element={<Find />} />
           <Route path="/apply" element={<QuickApply />} />

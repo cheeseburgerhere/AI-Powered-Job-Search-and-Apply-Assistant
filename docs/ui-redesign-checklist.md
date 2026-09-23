@@ -62,7 +62,7 @@ Delete this file when the `redesign/ledger-ui` branch merges.
 |---|---|---|---|
 | [ ] | `GET /tracker/board` | Tracker | |
 | [ ] | `GET /tracker/stats` | Today pipeline line; Tracker header | |
-| [ ] | `GET /tracker/events` | Today → recent activity | |
+| [ ] | `GET /tracker/events` (per job, or cross-job feed with `limit`) | Today → recent activity | |
 | [ ] | `GET /tracker/rejected-bins` | Tracker → rejected bins | |
 
 ## Removed with the dead pages (backend routes kept)

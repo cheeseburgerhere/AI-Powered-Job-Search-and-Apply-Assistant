@@ -11,6 +11,9 @@ class TrackerEventResponse(BaseModel):
     to_status: str
     note: Optional[str] = None
     created_at: Optional[datetime] = None
+    # Filled only for the cross-job feed so the UI can label rows without extra requests.
+    job_title: str = ""
+    job_company: str = ""
 
     model_config = {"from_attributes": True}
 

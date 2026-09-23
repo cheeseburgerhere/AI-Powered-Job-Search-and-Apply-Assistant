@@ -14,10 +14,12 @@ export interface CoverLetter {
 
 interface CoverLetterState {
   letters: CoverLetter[]
+  allLetters: CoverLetter[]
   loading: boolean
   error: string | null
 
   fetchLetters: (jobId: number) => Promise<void>
+  fetchAllLetters: () => Promise<void>
   generate: (jobId: number) => Promise<CoverLetter>
   refine: (letterId: number, feedback: string) => Promise<CoverLetter>
   updateContent: (letterId: number, content: string) => Promise<CoverLetter>
@@ -26,6 +28,7 @@ interface CoverLetterState {
 
 export const useCoverLetterStore = create<CoverLetterState>((set) => ({
   letters: [],
+  allLetters: [],
   loading: false,
   error: null,
 
@@ -36,6 +39,15 @@ export const useCoverLetterStore = create<CoverLetterState>((set) => ({
       set({ letters: data, loading: false })
     } catch {
       set({ loading: false })
+    }
+  },
+
+  fetchAllLetters: async () => {
+    try {
+      const { data } = await api.get('/cover-letters')
+      set({ allLetters: data })
+    } catch {
+      // silent
     }
   },
 

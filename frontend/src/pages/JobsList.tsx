@@ -19,11 +19,12 @@ type Sort = 'fit' | 'recent'
 export default function JobsList() {
   const { jobs, loading, error, fetchJobs } = useJobStore()
   const [params, setParams] = useSearchParams()
+  // Filters are local state; `?analysis=none` only seeds the "Not analysed" toggle for deep links.
   const [text, setText] = useState('')
   const [category, setCategory] = useState('')
   const [priority, setPriority] = useState('')
   const [minScore, setMinScore] = useState('')
-  const [needsAnalysis, setNeedsAnalysis] = useState(false)
+  const [needsAnalysis, setNeedsAnalysis] = useState(() => params.get('analysis') === 'none')
   const [sort, setSort] = useState<Sort>('fit')
   const [adding, setAdding] = useState(false)
 
