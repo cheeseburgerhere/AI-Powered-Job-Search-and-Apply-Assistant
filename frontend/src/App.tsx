@@ -1,11 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Layout from './components/Layout'
 import Today from './pages/Today'
-import Onboarding from './pages/Onboarding'
+import Profile from './pages/Profile'
 import JobsList from './pages/JobsList'
 import Find from './pages/Find'
 import QuickApply from './pages/QuickApply'
-import CoverLetterEditor from './pages/CoverLetterEditor'
+import Letters from './pages/Letters'
 import Tracker from './pages/Tracker'
 
 /** Keep old bookmarks and in-app links working, including their query strings. */
@@ -23,9 +23,9 @@ export default function App() {
           <Route path="/jobs" element={<JobsList />} />
           <Route path="/find" element={<Find />} />
           <Route path="/apply" element={<QuickApply />} />
-          <Route path="/letters" element={<CoverLetterEditor />} />
+          <Route path="/letters" element={<Letters />} />
           <Route path="/tracker" element={<Tracker />} />
-          <Route path="/profile" element={<Onboarding />} />
+          <Route path="/profile" element={<Profile />} />
 
           <Route path="/onboarding" element={<Redirect to="/profile" />} />
           <Route path="/jobs/list" element={<Redirect to="/jobs" />} />

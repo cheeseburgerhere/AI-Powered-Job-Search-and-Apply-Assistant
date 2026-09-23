@@ -26,7 +26,7 @@ Delete this file when the `redesign/ledger-ui` branch merges.
 |---|---|---|---|
 | [ ] | `GET /profile` (+ `needs_parsing`) | Profile, Today review queue | |
 | [ ] | `POST /profile/upload-resume` | Profile → Resume | |
-| [ ] | `PUT /profile` | Profile → details | |
+| [ ] | `PUT /profile` | Profile → Edit details (new: the old page never used it) | |
 | [ ] | `PUT /profile/preferences` | Profile → Preferences | |
 | [ ] | `POST /profile/writing-sample` | Profile → Writing voice | |
 | [ ] | `POST /profile/analyze-voice` | Profile → Writing voice | AI |
@@ -39,9 +39,9 @@ Delete this file when the `redesign/ledger-ui` branch merges.
 | [ ] | `GET /cover-letters` (`?job_id=`) | Letters; Jobs detail; Apply review | |
 | [ ] | `POST /cover-letters/generate` | Letters; Apply generate step | AI |
 | [ ] | `POST /cover-letters/:id/refine` | Letters; Apply review | AI |
-| [ ] | `PUT /cover-letters/:id` | Letters editor save | |
-| [ ] | `PUT /cover-letters/:id/status` | Letters → Approve / back to draft | |
-| [ ] | `POST /cover-letters/:id/manual-version` | Apply review (manual edit) | |
+| [ ] | `PUT /cover-letters/:id` | Letters → Save, only for your own latest draft | |
+| [ ] | `PUT /cover-letters/:id/status` | Letters → Approve / Back to draft | |
+| [ ] | `POST /cover-letters/:id/manual-version` | Letters → Save as vN (agent/server/older versions); Apply review | |
 | [ ] | `GET /cover-letters/:id/download` | Letters; Apply documents step | |
 
 ## Apply flow (QuickApply)
@@ -83,3 +83,7 @@ Delete this file when the `redesign/ledger-ui` branch merges.
 - Find adds a "Company boards" tab for direct Greenhouse/Lever/Ashby search by company slug,
   which the backend and MCP already supported but the old UI never exposed.
 - Search results merge into the saved jobs list instead of replacing it in the store.
+- Cover letters carry `source` (agent / server / manual / unknown). Editing someone else's
+  version always saves a new manual version, so agent drafts stay in the history.
+- Voice analysis stays server-AI only: the MCP tools can't save a voice profile and don't
+  return writing samples, so there is no agent path for it yet.
