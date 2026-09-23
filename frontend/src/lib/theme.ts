@@ -1,8 +1,7 @@
 export type ThemeChoice = 'light' | 'dark' | 'system'
 
 const STORAGE_KEY = 'theme'
-// Light until every page is on the ledger tokens; switch to 'system' afterwards.
-const DEFAULT_THEME: ThemeChoice = 'light'
+const DEFAULT_THEME: ThemeChoice = 'system'
 
 export function readTheme(): ThemeChoice {
   try {
@@ -18,6 +17,13 @@ export function applyTheme(choice: ThemeChoice) {
   const dark =
     choice === 'dark' || (choice === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
   document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+}
+
+/** Re-apply when the OS switches light/dark while the page is open and the choice is 'system'. */
+export function followSystemTheme() {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (readTheme() === 'system') applyTheme('system')
+  })
 }
 
 export function saveTheme(choice: ThemeChoice) {

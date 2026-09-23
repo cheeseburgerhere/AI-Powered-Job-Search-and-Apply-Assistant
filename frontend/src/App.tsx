@@ -4,7 +4,7 @@ import Today from './pages/Today'
 import Profile from './pages/Profile'
 import JobsList from './pages/JobsList'
 import Find from './pages/Find'
-import QuickApply from './pages/QuickApply'
+import Apply from './pages/Apply'
 import Letters from './pages/Letters'
 import Tracker from './pages/Tracker'
 
@@ -22,7 +22,7 @@ export default function App() {
           <Route path="/" element={<Today />} />
           <Route path="/jobs" element={<JobsList />} />
           <Route path="/find" element={<Find />} />
-          <Route path="/apply" element={<QuickApply />} />
+          <Route path="/apply" element={<Apply />} />
           <Route path="/letters" element={<Letters />} />
           <Route path="/tracker" element={<Tracker />} />
           <Route path="/profile" element={<Profile />} />

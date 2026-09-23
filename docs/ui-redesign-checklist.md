@@ -48,11 +48,11 @@ Delete this file when the `redesign/ledger-ui` branch merges.
 
 | Done | Call | New home | AI |
 |---|---|---|---|
-| [ ] | `POST /apply/scrape/debug` | Apply → paste link | |
+| [ ] | `POST /apply/scrape/debug` | Apply → Posting, and Details → Read posting again | |
 | [ ] | `POST /apply/generate-cover-letter` | Apply generate step (unsaved job) | AI |
 | [ ] | `POST /apply/refine-cover-letter` | Apply review (unsaved job) | AI |
 | [ ] | `POST /apply/cover-letter/pdf` | Apply documents step | |
-| [ ] | `POST /apply/company-context` | Apply confirm step | AI |
+| [ ] | `POST /apply/company-context` | Apply → Details → Read website | |
 | [ ] | `POST /apply/chat` | Apply → "Ask anything" | AI |
 | [ ] | `GET /jobs/:id` (prefill via `?jobId=`) | Apply entry from Jobs / Tracker | |
 
