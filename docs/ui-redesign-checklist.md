@@ -73,5 +73,13 @@ Delete this file when the `redesign/ledger-ui` branch merges.
 ## Legacy routes that must redirect
 
 `/onboarding` → `/profile`, `/jobs/list` → `/jobs`, `/jobs/find` → `/find`,
-`/jobs/find/api` and `/jobs/find/scrape` → `/find`, `/cover-letters` → `/letters`
-(query strings preserved).
+`/jobs/find/api` → `/find?tab=api`, `/jobs/find/scrape` → `/find?tab=boards`,
+`/cover-letters` → `/letters` (query strings preserved).
+
+## Behaviour changes to keep in mind
+
+- `GET /jobs/providers/health` runs live queries, so Find calls it only from "Test providers"
+  instead of on every page load. Configured/unconfigured state comes from capabilities.
+- Find adds a "Company boards" tab for direct Greenhouse/Lever/Ashby search by company slug,
+  which the backend and MCP already supported but the old UI never exposed.
+- Search results merge into the saved jobs list instead of replacing it in the store.

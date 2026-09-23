@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import api from '../api/client'
+import api, { errorDetail } from '../api/client'
 
 export interface Job {
   id: number
@@ -15,6 +15,7 @@ export interface Job {
   url: string | null
   fit_score: number | null
   fit_reasoning: string | null
+  fit_analysis: FitAnalysis | null
   category: string
   priority: string
   status: string
@@ -25,6 +26,12 @@ export interface Job {
   link_type: string | null
   created_at: string | null
   updated_at: string | null
+}
+
+export interface FitAnalysis {
+  reasons: string[]
+  gaps: string[]
+  summary: string
 }
 
 export interface JobSearchFilters {
@@ -51,7 +58,15 @@ interface JobState {
   error: string | null
 
   fetchJobs: (status?: string) => Promise<void>
-  createJob: (data: { title: string; company: string; description: string; url?: string; location?: string; remote_type?: string }) => Promise<Job>
+  createJob: (data: {
+    title: string
+    company: string
+    description: string
+    url?: string
+    location?: string
+    remote_type?: string
+    status?: string
+  }) => Promise<Job>
   updateJob: (
     id: number,
     data: {
@@ -85,9 +100,9 @@ export const useJobStore = create<JobState>((set) => ({
     try {
       const params = status ? { status } : {}
       const { data } = await api.get('/jobs', { params })
-      set({ jobs: data, loading: false })
-    } catch {
-      set({ loading: false })
+      set({ jobs: data, loading: false, error: null })
+    } catch (err) {
+      set({ loading: false, error: errorDetail(err, 'Could not load jobs') })
     }
   },
 
@@ -115,17 +130,16 @@ export const useJobStore = create<JobState>((set) => ({
   searchJobs: async (filters) => {
     set({ loading: true, error: null })
     try {
-      const { data } = await api.post('/jobs/search', filters)
-      set({ jobs: data, loading: false })
+      const { data } = await api.post<Job[]>('/jobs/search', filters)
+      // Results are persisted server-side; merge them so the saved list stays complete.
+      set((s) => {
+        const found = new Map(data.map((job) => [job.id, job]))
+        const kept = s.jobs.filter((job) => !found.has(job.id))
+        return { jobs: [...data, ...kept], loading: false }
+      })
       return data
-    } catch (err: any) {
-      const status = err?.response?.status
-      const detail = err?.response?.data?.detail || ''
-      if (status === 404 && typeof detail === 'string' && detail.toLowerCase().includes('no jobs found')) {
-        set({ jobs: [], loading: false, error: null })
-        return []
-      }
-      const message = detail || 'Job search failed'
+    } catch (err) {
+      const message = errorDetail(err, 'Job search failed')
       set({ loading: false, error: message })
       throw new Error(message)
     }
